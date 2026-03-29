@@ -1,0 +1,212 @@
+# ImpactKnowledge Backend API
+
+Node.js + Express backend API for the ImpactKnowledge Flutter mobile app.
+
+## Features
+
+- **Authentication**: JWT-based auth with refresh tokens
+- **Courses**: Full CRUD operations, modules, lessons
+- **Achievements**: User achievements and leaderboards  
+- **Payments**: Flutterwave integration for course and membership payments
+- **PostgreSQL**: Persistent data storage
+
+## Prerequisites
+
+- Node.js 14+ 
+- PostgreSQL (using Render's PostgreSQL)
+- npm or yarn
+
+## Installation
+
+1. **Clone or download this backend**
+   ```bash
+   cd impactapp-backend
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment**
+   - Copy `.env.example` to `.env`
+   - Update database credentials with your Render PostgreSQL details
+   - Set JWT_SECRET to a long random string
+   - Add Flutterwave credentials (optional for testing)
+
+4. **Run locally**
+   ```bash
+   npm run dev
+   ```
+   Server will start on http://localhost:3000
+
+## API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Create new account
+- `POST /api/auth/login` - Login user
+- `POST /api/auth/logout` - Logout user
+- `GET /api/auth/me` - Get current user
+- `POST /api/auth/refresh` - Refresh access token
+
+### Courses
+- `GET /api/courses` - List all courses (paginated, searchable)
+- `GET /api/courses/:id` - Get course details
+- `GET /api/courses/:courseId/modules` - Get course modules
+- `GET /api/modules/:moduleId/lessons` - Get module lessons
+
+### Enrollments
+- `POST /api/enrollments` - Enroll in course
+- `GET /api/enrollments` - Get user enrollments
+- `GET /api/enrollments/:id` - Get enrollment details
+- `PUT /api/enrollments/:id` - Update enrollment progress
+
+### Achievements
+- `GET /api/achievements` - List all achievements
+- `GET /api/achievements/:id` - Get achievement details
+- `GET /api/users/achievements` - Get user achievements
+- `GET /api/users/points` - Get user points
+- `GET /api/leaderboard` - Get leaderboard
+
+### Payments
+- `POST /api/payments/courses/initiate` - Initiate course payment
+- `POST /api/payments/membership/initiate` - Initiate membership payment
+- `POST /api/payments/verify` - Verify payment
+- `GET /api/payments` - Get user payments
+
+### Users
+- `GET /api/users/me` - Get user profile
+- `PUT /api/users/me` - Update user profile
+
+## Database
+
+The backend automatically creates all required tables on startup via the `initializeDatabase()` function in `src/database/index.js`.
+
+### Tables
+- `users` - User accounts
+- `courses` - Course catalog
+- `modules` - Course modules
+- `lessons` - Module lessons
+- `enrollments` - User course enrollments
+- `achievements` - Achievement definitions
+- `user_achievements` - User achievement progress
+- `user_points` - User points tracking
+- `membership_tiers` - Membership subscription tiers
+- `payments` - Payment transaction records
+
+## Deployment to Render
+
+### 1. Create a Web Service on Render
+- Go to https://dashboard.render.com
+- Create new "Web Service"
+- Connect your GitHub repository (or deploy from this folder manually)
+- Select **Start Command**: `npm start`
+- Add environment variables from `.env`
+
+### 2. Deploy steps
+- Push code to GitHub (recommended)
+- On Render dashboard, click "Deploy"
+- Monitor deployment logs
+
+### 3. Get your API URL
+Once deployed, you'll get a URL like:
+```
+https://impactapp-backend.onrender.com
+```
+
+Update your Flutter app's `lib/config/app_config.dart`:
+```dart
+class AppConfig {
+  static const String apiBaseUrl = 'https://impactapp-backend.onrender.com/api';
+}
+```
+
+## Testing
+
+### Health Check
+```bash
+curl https://impactapp-backend.onrender.com/health
+```
+
+### Register User
+```bash
+curl -X POST https://your-api-url.onrender.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "password123",
+    "full_name": "Test User"
+  }'
+```
+
+### Login
+```bash
+curl -X POST https://your-api-url.onrender.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "password123"
+  }'
+```
+
+## Seed Data
+
+You can add test data through the Flutter app or directly via API calls:
+
+1. Create courses
+2. Add modules to courses
+3. Add lessons to modules
+4. Create achievements
+5. Add membership tiers
+
+For production, create a seed script in `src/seeds/seed.js`.
+
+## Environment Variables
+
+See `.env.example` for all configuration options.
+
+**Key variables:**
+- `DB_HOST`, `DB_USER`, `DB_PASSWORD`: PostgreSQL connection
+- `PORT`: Server port (default 3000)
+- `JWT_SECRET`: Secret key for JWT signing
+- `NODE_ENV`: `development` or `production`
+
+## Error Handling
+
+All endpoints return errors in this format:
+```json
+{
+  "error": "Error message here"
+}
+```
+
+HTTP Status Codes:
+- 200: Success
+- 201: Created
+- 400: Bad Request
+- 401: Unauthorized
+- 403: Forbidden
+- 404: Not Found
+- 409: Conflict
+- 500: Server Error
+
+## Next Steps
+
+1. ✅ Deploy to Render
+2. ✅ Update Flutter app API URL
+3. ✅ Test signup/login flow
+4. ✅ Add seed data
+5. ✅ Configure Flutterwave for payments
+6. ✅ Add email notifications
+7. ✅ Add admin endpoints for creating courses
+
+## Support
+
+For issues or questions, refer to:
+- Flutter app: See `GITHUB_SYNC_AND_NEXT_STEPS.md`
+- Database: Check `.env` configuration
+- Logs: Monitor via Render dashboard
+
+---
+
+Built with ❤️ for ImpactKnowledge
