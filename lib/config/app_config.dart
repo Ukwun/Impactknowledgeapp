@@ -1,0 +1,55 @@
+// Application configuration for runtime endpoints and feature flags.
+
+class AppConfig {
+  /// API Configuration
+  // PRODUCTION: Use your deployed backend URL here
+  // For Render: https://your-app-name.onrender.com/api
+  // For Ngrok: https://random-id.ngrok.io/api
+  // For local testing: http://10.0.2.2:3000/api
+  static const String apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue:
+        'https://impactapp-backend.onrender.com/api', // UPDATE THIS WITH YOUR RENDER URL
+  );
+  static const String wsBaseUrl = String.fromEnvironment(
+    'WS_BASE_URL',
+    defaultValue:
+        'wss://impactapp-backend.onrender.com', // UPDATE THIS WITH YOUR RENDER URL
+  );
+  static const Duration apiTimeout = Duration(seconds: 60);
+
+  /// App Info
+  static const String appName = 'ImpactKnowledge';
+  static const String appVersion = '1.0.0';
+  static const String packageName = 'com.impactknowledge';
+
+  /// Feature Flags
+  static const bool enableAnalytics = true;
+  static const bool enableCrashReporting = true;
+  static const bool enablePushNotifications = true;
+
+  /// API Endpoints
+  static const String authEndpoint = '/auth';
+  static const String usersEndpoint = '/users';
+  static const String coursesEndpoint = '/courses';
+  static const String enrollmentsEndpoint = '/enrollments';
+  static const String achievementsEndpoint = '/achievements';
+  static const String leaderboardEndpoint = '/leaderboard';
+  static const String paymentsEndpoint = '/payments';
+  static const String onboardingEndpoint = '/onboarding';
+
+  /// Storage Keys
+  static const String tokenKey = 'auth_token';
+  static const String userKey = 'user_data';
+  static const String refreshTokenKey = 'refresh_token';
+  static const String onboardingCompleted = 'onboarding_completed';
+
+  /// Payment Configuration
+  static const String flutterwavePublicKey =
+      'FLUTTERWAVE_PUBLIC_KEY'; // Set from env
+  static const String flutterwaveSecretKey =
+      'FLUTTERWAVE_SECRET_KEY'; // Set from env
+
+  /// Firebase Configuration
+  static const bool useFirebase = false; // Set to true if using Firebase
+}
