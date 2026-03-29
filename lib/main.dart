@@ -11,6 +11,12 @@ import 'config/service_locator.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Catch all errors
+  FlutterError.onError = (FlutterErrorDetails details) {
+    print('❌ Flutter Error: ${details.exception}');
+    print('Stack: ${details.stack}');
+  };
+
   // Initialize Firebase
   try {
     await Firebase.initializeApp(
@@ -21,7 +27,14 @@ void main() async {
     print('❌ Firebase initialization error: $e');
   }
 
-  setupServiceLocator();
+  try {
+    setupServiceLocator();
+    print('✅ Service locator initialized successfully');
+  } catch (e) {
+    print('❌ Service locator error: $e');
+    rethrow;
+  }
+
   runApp(const MyApp());
 }
 

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "443939139404",
+    "project_id": "impactknowledge-ab14f",
+    "storage_bucket": "impactknowledge-ab14f.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:443939139404:android:bffb6aabc43ffb565769e9",
+        "android_client_info": {
+          "package_name": "com.impactknowledge.impactknowledge_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjH1pSjDjP-9K9nWLan6W2GnR-1NTHJPA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

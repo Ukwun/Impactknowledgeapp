@@ -5,7 +5,7 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase plugins
     id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
+    // id("com.google.firebase.crashlytics") // Disabled for release build
 }
 
 android {
