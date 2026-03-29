@@ -15,7 +15,7 @@ class CourseService {
   }) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/courses',
+        'courses',
         queryParameters: {
           'page': page,
           'pageSize': pageSize,
@@ -35,7 +35,7 @@ class CourseService {
   Future<Course> getCourseById(String courseId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/courses/$courseId',
+        '/api/courses/$courseId',
       );
       return Course.fromJson(response);
     } catch (e) {
@@ -47,7 +47,7 @@ class CourseService {
   Future<List<Module>> getCourseModules(String courseId) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/courses/$courseId/modules',
+        '/api/courses/$courseId/modules',
       );
       return response
           .map((item) => Module.fromJson(item as Map<String, dynamic>))
@@ -61,7 +61,7 @@ class CourseService {
   Future<List<Lesson>> getModuleLessons(String moduleId) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/modules/$moduleId/lessons',
+        '/api/modules/$moduleId/lessons',
       );
       return response
           .map((item) => Lesson.fromJson(item as Map<String, dynamic>))
@@ -75,7 +75,7 @@ class CourseService {
   Future<Lesson> getLessonById(String lessonId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/lessons/$lessonId',
+        '/api/lessons/$lessonId',
       );
       return Lesson.fromJson(response);
     } catch (e) {
@@ -87,7 +87,7 @@ class CourseService {
   Future<Enrollment> enrollCourse(String courseId) async {
     try {
       final response = await apiService.post<Map<String, dynamic>>(
-        '/enrollments',
+        '/api/enrollments',
         data: {'courseId': courseId},
       );
       return Enrollment.fromJson(response);
@@ -103,7 +103,7 @@ class CourseService {
   }) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/enrollments',
+        '/api/enrollments',
         queryParameters: {'page': page, 'pageSize': pageSize},
       );
       return response
@@ -118,7 +118,7 @@ class CourseService {
   Future<Enrollment> getEnrollmentById(String enrollmentId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/enrollments/$enrollmentId',
+        '/api/enrollments/$enrollmentId',
       );
       return Enrollment.fromJson(response);
     } catch (e) {
@@ -134,7 +134,7 @@ class CourseService {
   }) async {
     try {
       final response = await apiService.post<Map<String, dynamic>>(
-        '/lessons/$lessonId/progress',
+        '/api/lessons/$lessonId/progress',
         data: {'status': status, if (score != null) 'score': score},
       );
       return LessonProgress.fromJson(response);
@@ -147,7 +147,7 @@ class CourseService {
   Future<LessonProgress> getLessonProgress(String lessonId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/lessons/$lessonId/progress',
+        '/api/lessons/$lessonId/progress',
       );
       return LessonProgress.fromJson(response);
     } catch (e) {
@@ -159,7 +159,7 @@ class CourseService {
   Future<double> getEnrollmentProgress(String enrollmentId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/enrollments/$enrollmentId/progress',
+        '/api/enrollments/$enrollmentId/progress',
       );
       return (response['progressPercentage'] as num).toDouble();
     } catch (e) {
@@ -170,7 +170,7 @@ class CourseService {
   // Complete course
   Future<void> completeCourse(String enrollmentId) async {
     try {
-      await apiService.post('/enrollments/$enrollmentId/complete');
+      await apiService.post('enrollments/$enrollmentId/complete');
     } catch (e) {
       rethrow;
     }
@@ -179,7 +179,7 @@ class CourseService {
   // Drop course
   Future<void> dropCourse(String enrollmentId) async {
     try {
-      await apiService.post('/enrollments/$enrollmentId/drop');
+      await apiService.post('/api/enrollments/$enrollmentId/drop');
     } catch (e) {
       rethrow;
     }

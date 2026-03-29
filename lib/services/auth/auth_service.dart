@@ -3,6 +3,7 @@ import '../../models/auth/user_model.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'dart:convert';
+import 'package:http/http.dart' as http;
 import '../../config/app_config.dart';
 
 class AuthService {
@@ -11,66 +12,110 @@ class AuthService {
 
   AuthService({required this.apiService});
 
-  // Login
+  // Login - using direct HTTP instead of Dio (replaces problematic _postAuth)
   Future<AuthResponse> login(String email, String password) async {
     try {
-      final response = await _postAuth(
-        endpoints: ['/auth/login'],
-        data: {'email': email, 'password': password},
+      print('LOGIN: Starting login for $email');
+
+      // Direct HTTP POST to backend - NO Dio complications
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}api/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'password': password}),
       );
 
-      // Save tokens
-      await apiService.saveToken(response.accessToken);
-      if (response.refreshToken != null) {
-        await _secureStorage.write(
-          key: 'refresh_token',
-          value: response.refreshToken!,
+      print('LOGIN: Response status ${response.statusCode}');
+      print('LOGIN: Response body ${response.body}');
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception(
+          'Login failed: HTTP ${response.statusCode} - ${response.body}',
         );
       }
-      await saveUser(response.user);
 
-      return response;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+
+      // Parse authentication response with proper type handling
+      final authResponse = _parseAuthResponse(json);
+
+      // Save tokens
+      print(
+        '💾 AUTH: Saving token: ${authResponse.accessToken.substring(0, 50)}...',
+      );
+      await apiService.saveToken(authResponse.accessToken);
+      if (authResponse.refreshToken != null) {
+        await _secureStorage.write(
+          key: 'refresh_token',
+          value: authResponse.refreshToken!,
+        );
+      }
+      await saveUser(authResponse.user);
+
+      print('LOGIN: Success for $email');
+      return authResponse;
     } catch (e) {
+      print('LOGIN ERROR: $e');
       rethrow;
     }
   }
 
-  // Sign up
+  // Sign up - using direct HTTP instead of Dio
   Future<AuthResponse> signup(SignupRequest request) async {
     try {
+      // Backend expects: email, password, full_name, role
       final payload = {
-        ...request.toJson(),
-        // Web backend requires confirmPassword field
-        'confirmPassword': request.password,
-        // Use the role chosen during signup, default to student
+        'email': request.email,
+        'password': request.password,
+        'full_name': '${request.firstName} ${request.lastName}'.trim(),
         'role': request.role ?? 'student',
+        'confirmPassword': request.password,
       };
 
-      final response = await _postAuth(
-        // Support both baseUrl styles:
-        // - http://host:3000/api  + /auth/register
-        // - http://host:3000      + /api/auth/register
-        // Keep /auth/signup fallback for legacy backends.
-        endpoints: [
-          '/auth/register',
-          '/api/auth/register',
-          '/auth/signup',
-          '/api/auth/signup',
-        ],
-        data: payload,
+      // Direct HTTP POST to backend - NO Dio complications
+      final response = await http.post(
+        Uri.parse('${AppConfig.apiBaseUrl}api/auth/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(payload),
       );
 
-      await apiService.saveToken(response.accessToken);
-      if (response.refreshToken != null) {
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      print('SIGNUP RESPONSE: $json');
+      print('USER OBJECT: ${json['user']}');
+
+      AuthResponse authResponse;
+      try {
+        authResponse = _parseAuthResponse(json);
+      } catch (e) {
+        print('PARSE ERROR: $e');
+        print('ATTEMPTING TO PARSE USER: ${json['user']}');
+        print('USER TYPE: ${json['user'].runtimeType}');
+        if (json['user'] is Map) {
+          final userMap = json['user'] as Map;
+          for (var entry in userMap.entries) {
+            print(
+              'Field ${entry.key}: ${entry.value} (${entry.value.runtimeType})',
+            );
+          }
+        }
+        rethrow;
+      }
+
+      await apiService.saveToken(authResponse.accessToken);
+      if (authResponse.refreshToken != null) {
         await _secureStorage.write(
           key: 'refresh_token',
-          value: response.refreshToken!,
+          value: authResponse.refreshToken!,
         );
       }
-      await saveUser(response.user);
+      await saveUser(authResponse.user);
 
-      return response;
+      return authResponse;
     } catch (e) {
+      print('SIGNUP ERROR: $e');
       rethrow;
     }
   }
@@ -78,7 +123,7 @@ class AuthService {
   // Logout
   Future<void> logout() async {
     try {
-      await apiService.post('/auth/logout', data: {});
+      await apiService.post('auth/logout', data: {});
       await apiService.clearToken();
       await _secureStorage.delete(key: 'refresh_token');
       await _secureStorage.delete(key: AppConfig.userKey);
@@ -92,7 +137,7 @@ class AuthService {
 
   // Get current user with multi-endpoint fallback
   Future<UserProfile> getCurrentUser() async {
-    final endpoints = ['/auth/me', '/users/me', '/profile'];
+    final endpoints = ['auth/me', 'users/me', 'profile'];
     Object? lastError;
 
     for (final endpoint in endpoints) {
@@ -123,7 +168,8 @@ class AuthService {
       return saved;
     }
 
-    throw lastError ?? Exception('Unable to fetch user profile from any endpoint');
+    throw lastError ??
+        Exception('Unable to fetch user profile from any endpoint');
   }
 
   Future<void> saveUser(UserProfile user) async {
@@ -156,7 +202,7 @@ class AuthService {
       }
 
       final response = await apiService.post<AuthResponse>(
-        '/auth/refresh',
+        '/api/auth/refresh',
         data: {'refreshToken': refreshToken},
         fromJson: (json) {
           return AuthResponse.fromJson(json as Map<String, dynamic>);
@@ -172,7 +218,10 @@ class AuthService {
   // Forgot password
   Future<void> forgotPassword(String email) async {
     try {
-      await apiService.post('/auth/forgot-password', data: {'email': email});
+      await apiService.post(
+        '/api/auth/forgot-password',
+        data: {'email': email},
+      );
     } catch (e) {
       rethrow;
     }
@@ -182,7 +231,7 @@ class AuthService {
   Future<void> resetPassword(String token, String newPassword) async {
     try {
       await apiService.post(
-        '/auth/reset-password',
+        '/api/auth/reset-password',
         data: {'token': token, 'newPassword': newPassword},
       );
     } catch (e) {
@@ -212,31 +261,33 @@ class AuthService {
     }
   }
 
-  Future<AuthResponse> _postAuth({
-    required List<String> endpoints,
-    required Map<String, dynamic> data,
-  }) async {
-    Object? lastError;
-    for (final endpoint in endpoints) {
-      try {
-        return await apiService.post<AuthResponse>(
-          endpoint,
-          data: data,
-          fromJson: (json) {
-            return _parseAuthResponse(json as Map<String, dynamic>);
-          },
-        );
-      } catch (e) {
-        lastError = e;
-      }
-    }
-    throw lastError ?? Exception('Authentication request failed');
-  }
-
   AuthResponse _parseAuthResponse(Map<String, dynamic> json) {
     // Legacy backend shape already matches AuthResponse.
     if (json.containsKey('accessToken') && json.containsKey('user')) {
-      return AuthResponse.fromJson(json);
+      // Make a copy and normalize the user data BEFORE passing to fromJson
+      final jsonCopy = Map<String, dynamic>.from(json);
+      final userMap = jsonCopy['user'] is Map
+          ? Map<String, dynamic>.from(jsonCopy['user'] as Map)
+          : <String, dynamic>{};
+
+      // Critical: Convert id to string if it's an int (database returns int)
+      if (userMap['id'] is int) {
+        userMap['id'] = userMap['id'].toString();
+      }
+
+      // Ensure all required datetime fields exist as ISO strings
+      if (!userMap.containsKey('createdAt') || userMap['createdAt'] == null) {
+        userMap['createdAt'] = DateTime.now().toIso8601String();
+      }
+      if (!userMap.containsKey('updatedAt') || userMap['updatedAt'] == null) {
+        userMap['updatedAt'] = DateTime.now().toIso8601String();
+      }
+      if (!userMap.containsKey('emailVerified')) {
+        userMap['emailVerified'] = false;
+      }
+
+      jsonCopy['user'] = userMap;
+      return AuthResponse.fromJson(jsonCopy);
     }
 
     // Next.js web backend shape: { success, data: { token, refreshToken?, user } }.
@@ -253,11 +304,20 @@ class AuthService {
         ? Map<String, dynamic>.from(data['user'] as Map)
         : <String, dynamic>{};
 
+    // Convert id to string if it's an int
+    if (rawUser['id'] is int) {
+      rawUser['id'] = rawUser['id'].toString();
+    }
+
     // Ensure required fields exist for UserProfile.fromJson.
     final createdAt = rawUser['createdAt'] ?? DateTime.now().toIso8601String();
     rawUser['createdAt'] = createdAt;
     rawUser['updatedAt'] =
         rawUser['updatedAt'] ?? rawUser['updated_at'] ?? createdAt;
+
+    if (!rawUser.containsKey('emailVerified')) {
+      rawUser['emailVerified'] = false;
+    }
 
     // Normalize role values from backend enum style (e.g. STUDENT).
     final roleRaw = rawUser['role'];

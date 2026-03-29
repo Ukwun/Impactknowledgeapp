@@ -2,19 +2,17 @@
 
 class AppConfig {
   /// API Configuration
-  // PRODUCTION: Use your deployed backend URL here
-  // For Render: https://your-app-name.onrender.com/api
-  // For Ngrok: https://random-id.ngrok.io/api
-  // For local testing: http://10.0.2.2:3000/api
+  // PRODUCTION: Using Render.com cloud deployment
+  // Backend URL: https://impactapp-backend.onrender.com
+  static const String CLOUD_URL = 'https://impactapp-backend.onrender.com/';
+
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue:
-        'https://impactapp-backend.onrender.com/api', // UPDATE THIS WITH YOUR RENDER URL
+    defaultValue: CLOUD_URL,
   );
   static const String wsBaseUrl = String.fromEnvironment(
     'WS_BASE_URL',
-    defaultValue:
-        'wss://impactapp-backend.onrender.com', // UPDATE THIS WITH YOUR RENDER URL
+    defaultValue: 'wss://impactapp-backend.onrender.com',
   );
   static const Duration apiTimeout = Duration(seconds: 60);
 

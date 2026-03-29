@@ -151,20 +151,37 @@ class AuthController extends GetxController {
   String _toUserFacingAuthError(Object error) {
     final text = error.toString().toLowerCase();
 
+    // Log the full error for debugging
+    print('🔴 AUTH ERROR DETAILS:');
+    print('Error type: ${error.runtimeType}');
+    print('Error message: $error');
+
     if (text.contains('connection timeout') ||
         text.contains('connection error') ||
         text.contains('socketexception') ||
         text.contains('failed host lookup')) {
-      return 'Cannot reach the server right now.\n'
-          'Endpoint: ${AppConfig.apiBaseUrl}\n'
-          'If testing on emulator, use 10.0.2.2.\n'
-          'If testing on a physical phone, use your computer LAN IP and ensure backend is running and reachable on the same Wi-Fi.';
+      return '❌ Cannot reach the server.\n\n'
+          'Endpoint: ${AppConfig.apiBaseUrl}\n\n'
+          '✅ Things to check:\n'
+          '1. Is your device connected to internet? (Wi-Fi or mobile data)\n'
+          '2. Can you open websites in your browser?\n'
+          '3. If testing on EMULATOR: baseUrl should be 10.0.2.2:3000\n'
+          '4. If testing on PHYSICAL PHONE: make sure backend is online\n\n'
+          'Backend status check: Visit https://impactapp-backend.onrender.com/health in your browser';
     }
 
     if (text.contains('timeout')) {
-      return 'The server is taking too long to respond. Please try again in a moment.';
+      return '⏱ The server is taking too long to respond.\n\n'
+          'The backend might be overloaded or starting up.\n'
+          'Try again in a moment.';
     }
 
-    return error.toString();
+    if (text.contains('404')) {
+      return '🚫 Endpoint not found (404).\n\n'
+          'Server is reachable but the API endpoint doesn\'t exist.\n'
+          'Error: $error';
+    }
+
+    return '⚠️ Error: $error';
   }
 }

@@ -27,12 +27,25 @@ initializeDatabase().then(() => {
   console.log('Database initialized successfully');
 }).catch(err => {
   console.error('Database initialization failed:', err);
-  process.exit(1);
+  console.error('⚠️  Running without database - API endpoints will return 500 for database operations');
+  // Don't exit - let the server continue so we can test endpoints
 });
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Test endpoint to verify connectivity
+app.post('/api/test', (req, res) => {
+  console.log('TEST endpoint hit!');
+  console.log('Headers:', req.headers);
+  console.log('Body:', req.body);
+  res.json({ 
+    message: 'Test endpoint works!', 
+    received: req.body,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Routes
@@ -44,6 +57,7 @@ app.use('/api/enrollments', require('./src/routes/enrollments'));
 app.use('/api/leaderboard', require('./src/routes/leaderboard'));
 app.use('/api/membership-tiers', require('./src/routes/membership'));
 app.use('/api/payments', paymentRoutes);
+app.use('/api/dashboard', require('./src/routes/dashboard'));
 
 // 404 handler
 app.use((req, res) => {

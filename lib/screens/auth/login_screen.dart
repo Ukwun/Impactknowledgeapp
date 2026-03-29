@@ -22,7 +22,14 @@ class _LoginScreenState extends State<LoginScreen> {
     super.initState();
     final authController = Get.find<AuthController>();
     ever(authController.isLoggedIn, (loggedIn) {
-      if (loggedIn && mounted) Get.offAllNamed(AppRoutes.dashboard);
+      if (loggedIn && mounted) {
+        // Wait a moment to ensure token is fully persisted before navigating
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            Get.offAllNamed(AppRoutes.dashboard);
+          }
+        });
+      }
     });
   }
 

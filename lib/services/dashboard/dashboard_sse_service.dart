@@ -73,7 +73,7 @@ class DashboardSseService {
       try {
         final token = await _storage.read(key: AppConfig.tokenKey);
         final uri = Uri.parse(
-          '${AppConfig.apiBaseUrl}/dashboard/stream?role=$roleKey',
+          '${AppConfig.apiBaseUrl}dashboard/stream?role=$roleKey',
         );
 
         final request = http.Request('GET', uri)

@@ -1,73 +1,55 @@
 const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { query } = require('../database');
+const mockAuth = require('../services/mock-auth');
 const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Helper function to generate tokens
-function generateTokens(userId) {
-  const accessToken = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: '24h' });
-  const refreshToken = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: '7d' });
-  return { accessToken, refreshToken };
-}
+console.log('⚠️  AUTH USING IN-MEMORY MOCK AUTHENTICATION');
+console.log('⚠️  Data is NOT persisted between server restarts');
 
 // Register endpoint
 router.post('/register', async (req, res) => {
+  console.log('=== REGISTER ===', req.body);
+  
   try {
     const { email, password, full_name, role = 'student' } = req.body;
 
-    // Validate input
     if (!email || !password || !full_name) {
       return res.status(400).json({ error: 'Email, password, and full_name are required' });
     }
 
-    // Check if user already exists
-    const existingUser = await query('SELECT id FROM users WHERE email = $1', [email]);
-    if (existingUser.rows.length > 0) {
-      return res.status(409).json({ error: 'User already exists' });
-    }
+    // Register using mock auth
+    const user = await mockAuth.registerUser(email, password, full_name, role);
+    const { accessToken, refreshToken } = mockAuth.generateTokens(user.id);
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    // Create user
-    const result = await query(
-      'INSERT INTO users (email, password_hash, full_name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, full_name, role',
-      [email, passwordHash, full_name, role]
-    );
-
-    const user = result.rows[0];
-
-    // Create user_points entry
-    await query(
-      'INSERT INTO user_points (user_id, total_points, month_points, week_points) VALUES ($1, $2, $3, $4)',
-      [user.id, 0, 0, 0]
-    );
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.id);
+    console.log('✅ REGISTER SUCCESS: New user created with ID:', user.id);
 
     res.status(201).json({
       accessToken,
       refreshToken,
       user: {
-        id: user.id,
+        id: String(user.id),
         email: user.email,
         full_name: user.full_name,
-        role: user.role
+        role: user.role,
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+        emailVerified: user.email_verified
       }
     });
   } catch (err) {
-    console.error('Register error:', err);
-    res.status(500).json({ error: 'Registration failed' });
+    console.error('❌ Register error:', err.message);
+    if (err.message ===  'User already exists') {
+      return res.status(409).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Registration failed' });
   }
 });
 
 // Login endpoint
 router.post('/login', async (req, res) => {
+  console.log('=== LOGIN ===', req.body);
+  
   try {
     const { email, password } = req.body;
 
@@ -75,57 +57,55 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    // Find user
-    const result = await query('SELECT * FROM users WHERE email = $1', [email]);
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
+    // Login using mock auth
+    const user = await mockAuth.loginUser(email, password);
+    const { accessToken, refreshToken } = mockAuth.generateTokens(user.id);
 
-    const user = result.rows[0];
-
-    // Verify password
-    const passwordValid = await bcrypt.compare(password, user.password_hash);
-    if (!passwordValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.id);
+    console.log('✅ LOGIN SUCCESS: User authenticated:', user.id, 'Email:', email);
+    console.log('🔑 TOKEN ISSUED: Access token starts with:', accessToken.substring(0, 50) + '...');
 
     res.json({
       accessToken,
       refreshToken,
       user: {
-        id: user.id,
+        id: String(user.id),
         email: user.email,
         full_name: user.full_name,
         role: user.role,
-        profile_picture_url: user.profile_picture_url,
-        bio: user.bio
+        createdAt: user.created_at,
+        updatedAt: user.updated_at,
+        emailVerified: user.email_verified
       }
     });
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
+    console.error('❌ Login error:', err.message);
+    if (err.message === 'Invalid credentials') {
+      return res.status(401).json({ error: err.message });
+    }
+    res.status(500).json({ error: err.message || 'Login failed' });
   }
 });
 
 // Get current user endpoint
 router.get('/me', verifyToken, async (req, res) => {
   try {
-    const result = await query(
-      'SELECT id, email, full_name, role, profile_picture_url, bio, phone_number, location FROM users WHERE id = $1',
-      [req.user.id]
-    );
-
-    if (result.rows.length === 0) {
+    const user = mockAuth.getUserById(req.user.id);
+    
+    if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(result.rows[0]);
+    res.json({
+      id: String(user.id),
+      email: user.email,
+      full_name: user.full_name,
+      role: user.role,
+      createdAt: user.created_at,
+      updatedAt: user.updated_at
+    });
   } catch (err) {
-    console.error('Get user error:', err);
-    res.status(500).json({ error: 'Failed to fetch user' });
+    console.error('❌ Get user error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to fetch user' });
   }
 });
 
@@ -151,18 +131,22 @@ router.post('/refresh', async (req, res) => {
     }
 
     try {
-      const decoded = jwt.verify(refreshToken, JWT_SECRET);
-      const { accessToken, refreshToken: newRefreshToken } = generateTokens(decoded.id);
+      const jwt = require('jsonwebtoken');
+      console.log('🔄 REFRESH TOKEN: Attempting to verify refresh token');
+      const decoded = jwt.verify(refreshToken, mockAuth.JWT_SECRET);
+      console.log('✅ REFRESH TOKEN: Token verified, generating new tokens');
+      const { accessToken, refreshToken: newRefreshToken } = mockAuth.generateTokens(decoded.id);
 
       res.json({
         accessToken,
         refreshToken: newRefreshToken
       });
     } catch (err) {
-      res.status(403).json({ error: 'Invalid refresh token' });
+      console.error('❌ REFRESH TOKEN ERROR:', err.message);
+      res.status(403).json({ error: 'Invalid refresh token', details: err.message });
     }
   } catch (err) {
-    console.error('Refresh token error:', err);
+    console.error('❌ Refresh token error:', err.message);
     res.status(500).json({ error: 'Token refresh failed' });
   }
 });

@@ -9,7 +9,7 @@ class AchievementService {
   // Get all achievements
   Future<List<Achievement>> getAllAchievements() async {
     try {
-      final response = await apiService.get<List<dynamic>>('/achievements');
+      final response = await apiService.get<List<dynamic>>('achievements');
       return response
           .map((item) => Achievement.fromJson(item as Map<String, dynamic>))
           .toList();
@@ -22,7 +22,7 @@ class AchievementService {
   Future<Achievement> getAchievementById(String achievementId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/achievements/$achievementId',
+        'achievements/$achievementId',
       );
       return Achievement.fromJson(response);
     } catch (e) {
@@ -37,7 +37,7 @@ class AchievementService {
   }) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/users/achievements',
+        'users/achievements',
         queryParameters: {'page': page, 'pageSize': pageSize},
       );
       return response
@@ -52,7 +52,7 @@ class AchievementService {
   Future<UserPoints> getUserPoints() async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/users/points',
+        'users/points',
       );
       return UserPoints.fromJson(response);
     } catch (e) {
@@ -68,7 +68,7 @@ class AchievementService {
   }) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/leaderboard',
+        'leaderboard',
         queryParameters: {
           'page': page,
           'pageSize': pageSize,
@@ -87,7 +87,7 @@ class AchievementService {
   Future<Leaderboard> getUserRank() async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/leaderboard/me',
+        'leaderboard/me',
       );
       return Leaderboard.fromJson(response);
     } catch (e) {
@@ -99,7 +99,7 @@ class AchievementService {
   Future<List<Leaderboard>> getLeaderboardAroundUser({int radius = 5}) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/leaderboard/around-me',
+        'leaderboard/around-me',
         queryParameters: {'radius': radius},
       );
       return response
@@ -118,7 +118,7 @@ class AchievementService {
   }) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/users/$userId/achievements',
+        'users/$userId/achievements',
         queryParameters: {'page': page, 'pageSize': pageSize},
       );
       return response
@@ -133,7 +133,7 @@ class AchievementService {
   Future<UserPoints> getUserPointsByUserId(String userId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/users/$userId/points',
+        'users/$userId/points',
       );
       return UserPoints.fromJson(response);
     } catch (e) {

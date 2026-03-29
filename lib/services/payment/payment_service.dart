@@ -9,7 +9,9 @@ class PaymentService {
   // Get all membership tiers
   Future<List<MembershipTierModel>> getMembershipTiers() async {
     try {
-      final response = await apiService.get<List<dynamic>>('/membership-tiers');
+      final response = await apiService.get<List<dynamic>>(
+        '/api/membership-tiers',
+      );
       return response
           .map(
             (item) =>
@@ -25,7 +27,7 @@ class PaymentService {
   Future<MembershipTierModel> getMembershipTierById(String tierId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/membership-tiers/$tierId',
+        'membership-tiers/$tierId',
       );
       return MembershipTierModel.fromJson(response);
     } catch (e) {
@@ -41,7 +43,7 @@ class PaymentService {
   }) async {
     try {
       final response = await apiService.post<Map<String, dynamic>>(
-        '/payments/courses/initiate',
+        'payments/courses/initiate',
         data: {
           'courseId': courseId,
           'email': email,
@@ -63,7 +65,7 @@ class PaymentService {
   }) async {
     try {
       final response = await apiService.post<Map<String, dynamic>>(
-        '/payments/membership/initiate',
+        'payments/membership/initiate',
         data: {
           'membershipTierId': membershipTierId,
           'email': email,
@@ -81,7 +83,7 @@ class PaymentService {
   Future<Payment> verifyPayment(String reference) async {
     try {
       final response = await apiService.post<Map<String, dynamic>>(
-        '/payments/verify',
+        'payments/verify',
         data: {'reference': reference},
       );
       return Payment.fromJson(response);
@@ -98,7 +100,7 @@ class PaymentService {
   }) async {
     try {
       final response = await apiService.get<List<dynamic>>(
-        '/payments',
+        'payments',
         queryParameters: {
           'page': page,
           'pageSize': pageSize,
@@ -117,7 +119,7 @@ class PaymentService {
   Future<Payment> getPaymentById(String paymentId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/payments/$paymentId',
+        'payments/$paymentId',
       );
       return Payment.fromJson(response);
     } catch (e) {
@@ -129,7 +131,7 @@ class PaymentService {
   Future<UserMembership?> getUserMembership() async {
     try {
       final response = await apiService.get<Map<String, dynamic>?>(
-        '/users/membership',
+        'users/membership',
       );
       if (response == null) return null;
       return UserMembership.fromJson(response);
@@ -141,7 +143,7 @@ class PaymentService {
   // Cancel membership
   Future<void> cancelMembership() async {
     try {
-      await apiService.post('/users/membership/cancel');
+      await apiService.post('users/membership/cancel');
     } catch (e) {
       rethrow;
     }
@@ -151,7 +153,7 @@ class PaymentService {
   Future<bool> isCoursePurchased(String courseId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/payments/courses/$courseId/purchased',
+        'payments/courses/$courseId/purchased',
       );
       return response['purchased'] as bool;
     } catch (e) {
@@ -163,7 +165,7 @@ class PaymentService {
   Future<String> getPaymentReceipt(String paymentId) async {
     try {
       final response = await apiService.get<Map<String, dynamic>>(
-        '/payments/$paymentId/receipt',
+        'payments/$paymentId/receipt',
       );
       return response['receiptUrl'] as String;
     } catch (e) {

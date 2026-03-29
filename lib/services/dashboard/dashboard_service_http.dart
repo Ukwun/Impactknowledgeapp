@@ -92,26 +92,22 @@ class DashboardService {
         .catchError((_) {});
   }
 
-  // DIRECT HTTP INSTEAD OF DIO
+  // DIRECT HTTP - NO DIO!
   Future<Map<String, dynamic>> _getFromEndpoints(List<String> endpoints) async {
     Object? lastError;
 
     for (final endpoint in endpoints) {
       try {
-        // Get token directly from secure storage
-        final token = await _secureStorage.read(key: AppConfig.tokenKey);
+        // Get token from apiService
+        final token = await apiService.getToken();
 
-        print(
-          '🔑 DASHBOARD TOKEN: ${token != null ? token.substring(0, 50) + '...' : 'NULL'}',
-        );
-
-        // Build proper URL
+        // Build URL directly
         final baseUrl = AppConfig.apiBaseUrl.endsWith('/')
             ? AppConfig.apiBaseUrl
             : '${AppConfig.apiBaseUrl}/';
         final url = Uri.parse('${baseUrl}${endpoint}');
 
-        print('→ DASHBOARD: GET $url with Authorization header');
+        print('→ DASHBOARD REQUEST: GET $url');
 
         final response = await http
             .get(
@@ -123,16 +119,16 @@ class DashboardService {
             )
             .timeout(
               const Duration(seconds: 60),
-              onTimeout: () => throw Exception('Dashboard timeout'),
+              onTimeout: () => throw Exception('Dashboard request timeout'),
             );
 
-        print('← DASHBOARD: ${response.statusCode}');
+        print('← DASHBOARD RESPONSE: ${response.statusCode} $url');
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           return _normalizeResponse(data);
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
         }
       } catch (e) {
         print('✗ DASHBOARD ERROR: $e');
@@ -141,7 +137,8 @@ class DashboardService {
     }
 
     throw Exception(
-      'Unable to load dashboard: ${lastError ?? 'unknown error'}',
+      'Unable to load dashboard data from role endpoints: '
+      '${lastError ?? 'unknown error'}',
     );
   }
 

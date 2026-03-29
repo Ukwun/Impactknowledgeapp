@@ -23,6 +23,10 @@ class ApiService {
       ),
     );
 
+    logger.i('=== API SERVICE INITIALIZED ===');
+    logger.i('Base URL: ${AppConfig.apiBaseUrl}');
+    logger.i('Timeout: ${AppConfig.apiTimeout}');
+
     // Add interceptors
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -32,19 +36,19 @@ class ApiService {
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
-          logger.d('${options.method} ${options.uri}');
+          final fullUrl = '${options.baseUrl}${options.path}';
+          logger.i('→ REQUEST: ${options.method} $fullUrl');
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          logger.d(
-            'Response: ${response.statusCode} ${response.requestOptions.path}',
+          logger.i(
+            '← RESPONSE: ${response.statusCode} ${response.requestOptions.uri}',
           );
           return handler.next(response);
         },
         onError: (error, handler) {
-          logger.e(
-            'Error: ${error.message} [${error.requestOptions.method} ${error.requestOptions.uri}]',
-          );
+          logger.e('✗ ERROR [${error.type}]: ${error.message}');
+          logger.e('   URI: ${error.requestOptions.uri}');
           return handler.next(error);
         },
       ),
@@ -172,8 +176,12 @@ class ApiService {
     await _secureStorage.write(key: AppConfig.tokenKey, value: token);
   }
 
-  Future<String?> _getToken() async {
+  Future<String?> getToken() async {
     return await _secureStorage.read(key: AppConfig.tokenKey);
+  }
+
+  Future<String?> _getToken() async {
+    return await getToken();
   }
 
   Future<void> clearToken() async {
