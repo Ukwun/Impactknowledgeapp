@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: impactapp-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    rootDir: backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: impactapp_db
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: NODE_ENV
+        value: production
