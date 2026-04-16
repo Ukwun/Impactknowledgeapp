@@ -1,40 +1,268 @@
 const express = require('express');
-const { query } = require('../database');
-const { verifyToken } = require('../middleware/auth');
-
 const router = express.Router();
+const { verifyToken } = require('../middleware/auth');
+const AchievementService = require('../services/achievement-service');
 
-// Get all achievements
+/**
+ * GET /api/achievements - Get all achievements
+ */
 router.get('/', async (req, res) => {
   try {
-    const result = await query(
-      'SELECT id, name, description, icon_url, points_reward, criteria FROM achievements ORDER BY points_reward DESC'
-    );
+    const { category } = req.query;
+    const result = await AchievementService.getAchievements(category);
 
-    res.json(result.rows);
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
   } catch (err) {
-    console.error('Get achievements error:', err);
-    res.status(500).json({ error: 'Failed to fetch achievements' });
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 
-// Get achievement by ID
-router.get('/:id', async (req, res) => {
+/**
+ * GET /api/achievements/stats - Get achievement statistics
+ */
+router.get('/stats', async (req, res) => {
   try {
-    const { id } = req.params;
-    const result = await query(
-      'SELECT id, name, description, icon_url, points_reward, criteria FROM achievements WHERE id = $1',
-      [id]
-    );
+    const result = await AchievementService.getStatistics();
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Achievement not found' });
+    if (!result.success) {
+      return res.status(400).json(result);
     }
 
-    res.json(result.rows[0]);
+    res.json(result);
   } catch (err) {
-    console.error('Get achievement error:', err);
-    res.status(500).json({ error: 'Failed to fetch achievement' });
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * GET /api/achievements/user/:userId - Get user's achievements
+ */
+router.get('/user/:userId', async (req, res) => {
+  try {
+    const result = await AchievementService.getUserAchievements(
+      parseInt(req.params.userId)
+    );
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * GET /api/achievements/user/:userId/unlocked - Get user's unlocked achievements
+ */
+router.get('/user/:userId/unlocked', async (req, res) => {
+  try {
+    const result = await AchievementService.getUnlockedAchievements(
+      parseInt(req.params.userId)
+    );
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * GET /api/achievements/me - Get current user's achievements
+ */
+router.get('/me/all', verifyToken, async (req, res) => {
+  try {
+    const result = await AchievementService.getUserAchievements(req.user.id);
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * POST /api/achievements - Create new achievement (admin only)
+ */
+router.post('/', verifyToken, async (req, res) => {
+  try {
+    // Only admins can create achievements
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only admins can create achievements',
+      });
+    }
+
+    const { title, description, iconUrl, points, category, unlockCondition } =
+      req.body;
+
+    if (!title || !points) {
+      return res.status(400).json({
+        success: false,
+        error: 'Title and points are required',
+      });
+    }
+
+    const result = await AchievementService.createAchievement(
+      {
+        title,
+        description,
+        iconUrl,
+        points,
+        category,
+        unlockCondition,
+      },
+      req.user.id,
+      req
+    );
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * PUT /api/achievements/:id - Update achievement (admin only)
+ */
+router.put('/:id', verifyToken, async (req, res) => {
+  try {
+    // Only admins can update achievements
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only admins can update achievements',
+      });
+    }
+
+    const result = await AchievementService.updateAchievement(
+      parseInt(req.params.id),
+      req.body,
+      req.user.id,
+      req
+    );
+
+    if (!result.success) {
+      return res.status(403).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * POST /api/achievements/:id/unlock - Manually unlock achievement (admin only)
+ */
+router.post('/:id/unlock', verifyToken, async (req, res) => {
+  try {
+    // Only admins can manually unlock achievements
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only admins can manually unlock achievements',
+      });
+    }
+
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        error: 'User ID is required',
+      });
+    }
+
+    const result = await AchievementService.manualUnlock(
+      userId,
+      parseInt(req.params.id),
+      req
+    );
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * POST /api/achievements/check - Check and auto-unlock achievements
+ * Used internally after quiz completion, course completion, etc.
+ */
+router.post('/check/auto-unlock', verifyToken, async (req, res) => {
+  try {
+    const { triggerEvent, metadata = {} } = req.body;
+
+    if (!triggerEvent) {
+      return res.status(400).json({
+        success: false,
+        error: 'Trigger event is required',
+      });
+    }
+
+    const result = await AchievementService.checkAndUnlockAchievements(
+      req.user.id,
+      triggerEvent,
+      metadata,
+      req
+    );
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 

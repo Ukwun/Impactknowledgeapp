@@ -63,7 +63,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              membership!.membershipTierName,
+                              membership!['tier_name'] ?? 'Premium',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 24,
@@ -72,7 +72,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Valid until ${_formatDate(membership.expiryDate)}',
+                              _buildExpiryDateText(membership),
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 12,
@@ -88,7 +88,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                                 onPressed: () {
                                   _showCancelDialog(
                                     context,
-                                    membership.id,
+                                    membership['id'] ?? '',
                                     paymentController,
                                   );
                                 },
@@ -150,8 +150,8 @@ class _MembershipScreenState extends State<MembershipScreen> {
                 delegate: SliverChildBuilderDelegate((context, index) {
                   final tier = paymentController.membershipTiers[index];
                   final price = _billingCycle == 'monthly'
-                      ? tier.monthlyPrice
-                      : tier.annualPrice;
+                      ? tier['monthly_price'] ?? 0.0
+                      : tier['annual_price'] ?? 0.0;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 16),
@@ -169,13 +169,13 @@ class _MembershipScreenState extends State<MembershipScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  tier.name,
+                                  tier['name'] ?? 'Tier',
                                   style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                if (tier.name == 'Free')
+                                if (tier['name'] == 'Free')
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -199,7 +199,7 @@ class _MembershipScreenState extends State<MembershipScreen> {
                             ...[
                               const SizedBox(height: 8),
                               Text(
-                                tier.description,
+                                tier['description'] ?? '',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey[600],
@@ -231,38 +231,43 @@ class _MembershipScreenState extends State<MembershipScreen> {
                             ),
                             const SizedBox(height: 16),
                             // Features List
-                            if (tier.features.isNotEmpty) ...[
+                            if ((tier['features'] as List?)?.isNotEmpty ??
+                                false) ...[
                               Column(
-                                children: tier.features.map((feature) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.check_circle,
-                                          color: Colors.green,
-                                          size: 16,
+                                children: ((tier['features'] as List?) ?? [])
+                                    .map((feature) {
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 8,
                                         ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            feature.trim(),
-                                            style: const TextStyle(
-                                              fontSize: 13,
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green,
+                                              size: 16,
                                             ),
-                                          ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                feature.trim(),
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
+                                      );
+                                    })
+                                    .toList(),
                               ),
                               const SizedBox(height: 16),
                             ],
                             // Action Button
                             SizedBox(
                               width: double.infinity,
-                              child: tier.name == 'Free'
+                              child: tier['name'] == 'Free'
                                   ? ElevatedButton(
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.grey[400],
@@ -323,15 +328,12 @@ class _MembershipScreenState extends State<MembershipScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
               onPressed: () {
                 Navigator.pop(context);
-                // Get user email from auth controller
-                final userEmail = authController.currentUser.value?.email ?? '';
+                final tierId = tier['id'] ?? '';
+                final price = _billingCycle == 'monthly'
+                    ? (tier['monthly_price'] ?? 9.99)
+                    : (tier['annual_price'] ?? 99.99);
 
-                controller.initiateMembershipPayment(
-                  tier.id,
-                  email: userEmail,
-                  phoneNumber: '', // Phone not available in user profile
-                  billingCycle: _billingCycle,
-                );
+                controller.initiateMembershipPayment(tierId, price.toDouble());
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Redirecting to payment...')),
                 );
@@ -381,5 +383,27 @@ class _MembershipScreenState extends State<MembershipScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _buildExpiryDateText(Map<String, dynamic> membership) {
+    final expiryValue = membership['expiry_date'];
+    if (expiryValue == null) {
+      return 'Membership active indefinitely';
+    }
+
+    try {
+      late DateTime expiryDate;
+      if (expiryValue is DateTime) {
+        expiryDate = expiryValue;
+      } else if (expiryValue is String) {
+        expiryDate = DateTime.parse(expiryValue);
+      } else {
+        return 'Membership active indefinitely';
+      }
+
+      return 'Valid until ${_formatDate(expiryDate)}';
+    } catch (e) {
+      return 'Membership details unavailable';
+    }
   }
 }

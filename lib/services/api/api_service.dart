@@ -171,6 +171,210 @@ class ApiService {
     }
   }
 
+  // ==================== QUIZ ENDPOINTS ====================
+  Future<dynamic> getQuizzes(String courseId) async {
+    try {
+      return await get('quiz/course/$courseId');
+    } catch (e) {
+      logger.e('Error fetching quizzes: $e');
+      return [];
+    }
+  }
+
+  Future<dynamic> getQuizDetail(String quizId) async {
+    try {
+      return await get('quiz/$quizId');
+    } catch (e) {
+      logger.e('Error fetching quiz detail: $e');
+      return {};
+    }
+  }
+
+  Future<dynamic> getQuizQuestions(String quizId) async {
+    try {
+      return await get('quiz/$quizId/questions');
+    } catch (e) {
+      logger.e('Error fetching quiz questions: $e');
+      return [];
+    }
+  }
+
+  Future<dynamic> startQuizAttempt(String quizId) async {
+    try {
+      return await post('quiz/$quizId/attempt/start');
+    } catch (e) {
+      logger.e('Error starting quiz attempt: $e');
+      return {'attemptId': '', 'status': 'error'};
+    }
+  }
+
+  Future<dynamic> submitQuizAttempt(
+    String attemptId,
+    Map<String, dynamic> answers,
+  ) async {
+    try {
+      return await post(
+        'quiz/attempt/$attemptId/submit',
+        data: {'answers': answers},
+      );
+    } catch (e) {
+      logger.e('Error submitting quiz: $e');
+      return {'score': 0, 'passed': false};
+    }
+  }
+
+  Future<Map<String, dynamic>?> getQuizAttemptDetail(String attemptId) async {
+    try {
+      final response = await get('quiz/attempt/$attemptId');
+      return response as Map<String, dynamic>;
+    } catch (e) {
+      logger.e('Error fetching attempt detail: $e');
+      return null;
+    }
+  }
+
+  Future<dynamic> getLeaderboard(String quizId, {int limit = 100}) async {
+    try {
+      return await get(
+        'quiz/$quizId/leaderboard',
+        queryParameters: {'limit': limit},
+      );
+    } catch (e) {
+      logger.e('Error fetching leaderboard: $e');
+      return [];
+    }
+  }
+
+  // ==================== ASSIGNMENT ENDPOINTS ====================
+  Future<dynamic> getAssignments(String courseId) async {
+    try {
+      return await get('assignment/course/$courseId');
+    } catch (e) {
+      logger.e('Error fetching assignments: $e');
+      return [];
+    }
+  }
+
+  Future<dynamic> getAssignmentDetail(String assignmentId) async {
+    try {
+      return await get('assignment/$assignmentId');
+    } catch (e) {
+      logger.e('Error fetching assignment detail: $e');
+      return {};
+    }
+  }
+
+  Future<dynamic> submitAssignment(
+    String assignmentId,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      return await post('assignment/$assignmentId/submit', data: data);
+    } catch (e) {
+      logger.e('Error submitting assignment: $e');
+      return {'submissionId': '', 'status': 'error'};
+    }
+  }
+
+  Future<Map<String, dynamic>?> getSubmission(String submissionId) async {
+    try {
+      final response = await get('assignment/submission/$submissionId');
+      return response as Map<String, dynamic>;
+    } catch (e) {
+      logger.e('Error fetching submission: $e');
+      return null;
+    }
+  }
+
+  Future<dynamic> getSubmissions(String assignmentId) async {
+    try {
+      return await get('assignment/$assignmentId/submissions');
+    } catch (e) {
+      logger.e('Error fetching submissions: $e');
+      return [];
+    }
+  }
+
+  // ==================== EVENT ENDPOINTS ====================
+  Future<dynamic> getEvents() async {
+    try {
+      return await get('event');
+    } catch (e) {
+      logger.e('Error fetching events: $e');
+      return [];
+    }
+  }
+
+  Future<dynamic> getRegisteredEvents() async {
+    try {
+      return await get('event/registered');
+    } catch (e) {
+      logger.e('Error fetching registered events: $e');
+      return [];
+    }
+  }
+
+  Future<dynamic> getUpcomingEvents() async {
+    try {
+      return await get('event/upcoming');
+    } catch (e) {
+      logger.e('Error fetching upcoming events: $e');
+      return [];
+    }
+  }
+
+  Future<dynamic> getEventDetail(String eventId) async {
+    try {
+      return await get('event/$eventId');
+    } catch (e) {
+      logger.e('Error fetching event detail: $e');
+      return {};
+    }
+  }
+
+  Future<dynamic> registerEvent(String eventId) async {
+    try {
+      return await post('event/$eventId/register');
+    } catch (e) {
+      logger.e('Error registering for event: $e');
+      return {'success': false};
+    }
+  }
+
+  Future<dynamic> unregisterEvent(String eventId) async {
+    try {
+      return await post('event/$eventId/unregister');
+    } catch (e) {
+      logger.e('Error unregistering from event: $e');
+      return {'success': false};
+    }
+  }
+
+  Future<List<Map<String, dynamic>>?> getEventAttendees(String eventId) async {
+    try {
+      final response = await get('event/$eventId/attendees');
+      if (response is List) {
+        return List<Map<String, dynamic>>.from(
+          response.map((e) => e as Map<String, dynamic>),
+        );
+      }
+      return null;
+    } catch (e) {
+      logger.e('Error fetching event attendees: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getEventAnalytics(String eventId) async {
+    try {
+      final response = await get('event/$eventId/analytics');
+      return response as Map<String, dynamic>;
+    } catch (e) {
+      logger.e('Error fetching event analytics: $e');
+      return null;
+    }
+  }
+
   // Token management
   Future<void> saveToken(String token) async {
     await _secureStorage.write(key: AppConfig.tokenKey, value: token);

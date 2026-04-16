@@ -7,27 +7,27 @@ part of 'user_model.dart';
 // **************************************************************************
 
 UserProfile _$UserProfileFromJson(Map<String, dynamic> json) => UserProfile(
-  id: json['id'] as String,
-  email: json['email'] as String,
-  fullName: json['fullName'] as String?,
-  firstName: json['firstName'] as String?,
-  lastName: json['lastName'] as String?,
-  phone: json['phone'] as String?,
-  state: json['state'] as String?,
-  institution: json['institution'] as String?,
-  avatarUrl: json['avatarUrl'] as String?,
-  bio: json['bio'] as String?,
-  createdAt: DateTime.parse(json['createdAt'] as String),
-  updatedAt: DateTime.parse(json['updatedAt'] as String),
-  role: $enumDecodeNullable(_$UserRoleEnumMap, json['role']),
-  emailVerified: json['emailVerified'] as bool? ?? false,
-  accountStatus: json['accountStatus'] as String?,
-  countryOfResidence: json['countryOfResidence'] as String?,
-  professionOrStudyArea: json['professionOrStudyArea'] as String?,
-  reasonForJoining: json['reasonForJoining'] as String?,
-  membershipTierId: json['membershipTierId'] as String?,
-  referralCode: json['referralCode'] as String?,
-);
+      id: json['id'] as String,
+      email: json['email'] as String,
+      fullName: json['fullName'] as String?,
+      firstName: json['firstName'] as String?,
+      lastName: json['lastName'] as String?,
+      phone: json['phone'] as String?,
+      state: json['state'] as String?,
+      institution: json['institution'] as String?,
+      avatarUrl: json['avatarUrl'] as String?,
+      bio: json['bio'] as String?,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      role: $enumDecodeNullable(_$UserRoleEnumMap, json['role']),
+      emailVerified: json['emailVerified'] as bool? ?? false,
+      accountStatus: json['accountStatus'] as String?,
+      countryOfResidence: json['countryOfResidence'] as String?,
+      professionOrStudyArea: json['professionOrStudyArea'] as String?,
+      reasonForJoining: json['reasonForJoining'] as String?,
+      membershipTierId: json['membershipTierId'] as String?,
+      referralCode: json['referralCode'] as String?,
+    );
 
 Map<String, dynamic> _$UserProfileToJson(UserProfile instance) =>
     <String, dynamic>{
@@ -66,10 +66,10 @@ const _$UserRoleEnumMap = {
 };
 
 AuthResponse _$AuthResponseFromJson(Map<String, dynamic> json) => AuthResponse(
-  accessToken: json['accessToken'] as String,
-  refreshToken: json['refreshToken'] as String?,
-  user: UserProfile.fromJson(json['user'] as Map<String, dynamic>),
-);
+      accessToken: json['accessToken'] as String,
+      refreshToken: json['refreshToken'] as String?,
+      user: UserProfile.fromJson(json['user'] as Map<String, dynamic>),
+    );
 
 Map<String, dynamic> _$AuthResponseToJson(AuthResponse instance) =>
     <String, dynamic>{
@@ -79,12 +79,15 @@ Map<String, dynamic> _$AuthResponseToJson(AuthResponse instance) =>
     };
 
 LoginRequest _$LoginRequestFromJson(Map<String, dynamic> json) => LoginRequest(
-  email: json['email'] as String,
-  password: json['password'] as String,
-);
+      email: json['email'] as String,
+      password: json['password'] as String,
+    );
 
 Map<String, dynamic> _$LoginRequestToJson(LoginRequest instance) =>
-    <String, dynamic>{'email': instance.email, 'password': instance.password};
+    <String, dynamic>{
+      'email': instance.email,
+      'password': instance.password,
+    };
 
 SignupRequest _$SignupRequestFromJson(Map<String, dynamic> json) =>
     SignupRequest(

@@ -1,171 +1,430 @@
+/**
+ * Payment Routes - Card & Bank Transfers
+ * Realistic payment processing with Paystack
+ */
+
 const express = require('express');
 const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
-const crypto = require('crypto');
+const PaystackService = require('../services/paystack_service');
+const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
+const paystack = new PaystackService();
 
-// Generate unique reference ID
-function generateReferenceId() {
-  return 'REF_' + crypto.randomBytes(8).toString('hex').toUpperCase();
-}
+// ============================================
+// CARD PAYMENT ROUTES
+// ============================================
 
-// Initiate payment for course
-router.post('/courses/initiate', verifyToken, async (req, res) => {
+/**
+ * POST /api/payments/card/initialize
+ * Initiate card payment for course/membership
+ */
+router.post('/card/initialize', verifyToken, async (req, res) => {
   try {
-    const { courseId, email, phoneNumber } = req.body;
+    const { itemType, itemId, amount, description } = req.body;
+    const userId = req.user.id;
 
-    if (!courseId || !email || !phoneNumber) {
-      return res.status(400).json({ error: 'courseId, email, and phoneNumber are required' });
-    }
-
-    // Get course details
-    const courseResult = await query('SELECT id, title, price FROM courses WHERE id = $1', [courseId]);
-    if (courseResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
-
-    const course = courseResult.rows[0];
-    const referenceId = generateReferenceId();
-
-    // Create payment record
-    const paymentResult = await query(
-      `INSERT INTO payments (user_id, type, amount, currency, reference_id, status, email, phone_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, reference_id, amount, currency`,
-      [req.user.id, 'course', course.price, 'NGN', referenceId, 'pending', email, phoneNumber]
-    );
-
-    // Return Flutterwave initialization response format
-    res.json({
-      reference_id: referenceId,
-      tx_ref: referenceId,
-      amount: course.price,
-      currency: 'NGN',
-      email: email,
-      phone_number: phoneNumber,
-      customer_name: req.user.full_name || 'Customer',
-      title: `Payment for ${course.title}`,
-      description: course.title,
-      redirect_url: 'https://your-app-domain.com/payment-success'
-    });
-  } catch (err) {
-    console.error('Initiate course payment error:', err);
-    res.status(500).json({ error: 'Failed to initiate payment' });
-  }
-});
-
-// Initiate payment for membership
-router.post('/membership/initiate', verifyToken, async (req, res) => {
-  try {
-    const { membershipTierId, email, phoneNumber, billingCycle } = req.body;
-
-    if (!membershipTierId || !email || !phoneNumber || !billingCycle) {
-      return res.status(400).json({ 
-        error: 'membershipTierId, email, phoneNumber, and billingCycle are required' 
+    if (!['course', 'membership'].includes(itemType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid itemType. Must be "course" or "membership"',
       });
     }
 
-    // Get membership tier details
-    const tierResult = await query(
-      'SELECT id, name, monthly_price, annual_price FROM membership_tiers WHERE id = $1',
-      [membershipTierId]
-    );
-    if (tierResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Membership tier not found' });
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid amount',
+      });
     }
 
-    const tier = tierResult.rows[0];
-    const amount = billingCycle === 'annual' ? tier.annual_price : tier.monthly_price;
-    const referenceId = generateReferenceId();
+    // Get user email
+    const userResult = await query('SELECT email FROM users WHERE id = $1', [userId]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const userEmail = userResult.rows[0].email;
 
     // Create payment record
+    const paymentReference = `PKG_${uuidv4().substring(0, 12).toUpperCase()}`;
     const paymentResult = await query(
-      `INSERT INTO payments (user_id, type, amount, currency, reference_id, status, email, phone_number)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, reference_id, amount, currency`,
-      [req.user.id, 'membership', amount, 'NGN', referenceId, 'pending', email, phoneNumber]
+      `INSERT INTO payments 
+       (user_id, item_type, item_id, amount, reference, status, payment_method, metadata, created_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', 'card', $6, NOW())
+       RETURNING id, reference`,
+      [
+        userId,
+        itemType,
+        itemId,
+        amount,
+        paymentReference,
+        JSON.stringify({
+          description,
+          initiatedAt: new Date().toISOString(),
+        }),
+      ]
     );
 
-    // Return Flutterwave initialization response format
+    // Initialize Paystack card payment
+    const paystackResponse = await paystack.initializeCardPayment(
+      userEmail,
+      amount,
+      paymentReference,
+      {
+        itemType,
+        itemId,
+        userId,
+      }
+    );
+
     res.json({
-      reference_id: referenceId,
-      tx_ref: referenceId,
-      amount: amount,
-      currency: 'NGN',
-      email: email,
-      phone_number: phoneNumber,
-      customer_name: req.user.full_name || 'Customer',
-      title: `${tier.name} Membership - ${billingCycle}`,
-      description: `${billingCycle === 'annual' ? 'Annual' : 'Monthly'} subscription to ${tier.name}`,
-      redirect_url: 'https://your-app-domain.com/payment-success'
+      success: true,
+      reference: paymentReference,
+      paymentUrl: paystackResponse.paymentUrl,
+      accessCode: paystackResponse.accessCode,
+      amount,
     });
   } catch (err) {
-    console.error('Initiate membership payment error:', err);
-    res.status(500).json({ error: 'Failed to initiate payment' });
+    console.error('Initialize card payment error:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Verify payment
-router.post('/verify', verifyToken, async (req, res) => {
+/**
+ * POST /api/payments/card/verify
+ * Verify card payment was successful
+ */
+router.post('/card/verify', verifyToken, async (req, res) => {
   try {
-    const { reference_id, flutterwave_id } = req.body;
+    const { reference } = req.body;
+    const userId = req.user.id;
 
-    if (!reference_id) {
-      return res.status(400).json({ error: 'reference_id is required' });
+    if (!reference) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment reference is required',
+      });
     }
 
-    // Find payment record
+    // Get payment from DB
     const paymentResult = await query(
-      'SELECT id, user_id, type, amount FROM payments WHERE reference_id = $1 AND user_id = $2',
-      [reference_id, req.user.id]
+      `SELECT * FROM payments WHERE reference = $1 AND user_id = $2`,
+      [reference, userId]
     );
 
     if (paymentResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Payment not found' });
+      return res.status(404).json({
+        success: false,
+        error: 'Payment not found',
+      });
     }
 
     const payment = paymentResult.rows[0];
 
-    // Update payment status to successful
-    await query(
-      'UPDATE payments SET status = $1, flutterwave_id = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      ['successful', flutterwave_id, payment.id]
-    );
+    // Verify with Paystack
+    const verification = await paystack.verifyCardPayment(reference);
 
-    // If course payment, create enrollment
-    if (payment.type === 'course') {
-      const enrollmentResult = await query(
-        'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
-        [req.user.id, reference_id.split('_')[1] || null]
-      );
-
-      // Note: In production, you'd need to store courseId in payments table
+    if (!verification.success) {
+      return res.json({
+        success: false,
+        error: 'Payment verification failed',
+        status: 'failed',
+      });
     }
 
-    res.json({ 
-      status: 'successful',
+    // Payment successful - update DB
+    await query(
+      `UPDATE payments 
+       SET status = 'completed', updated_at = NOW(),
+           metadata = jsonb_set(metadata, '{verifiedAt}', to_jsonb($2::text))
+       WHERE id = $3`,
+      [reference, new Date().toISOString(), payment.id]
+    );
+
+    // Grant access based on item type
+    if (payment.item_type === 'course') {
+      // Check if already enrolled
+      const enrollmentCheck = await query(
+        `SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2`,
+        [userId, payment.item_id]
+      );
+
+      if (enrollmentCheck.rows.length === 0) {
+        // Create enrollment
+        await query(
+          `INSERT INTO enrollments (user_id, course_id, enrollment_date)
+           VALUES ($1, $2, NOW())`,
+          [userId, payment.item_id]
+        );
+      }
+    } else if (payment.item_type === 'membership') {
+      // Update user membership
+      await query(
+        `UPDATE users 
+         SET membership_tier_id = $1, membership_expires_at = NOW() + INTERVAL '30 days'
+         WHERE id = $2`,
+        [payment.item_id, userId]
+      );
+    }
+
+    // Log transaction
+    await query(
+      `INSERT INTO user_activities (user_id, activity_type, description, metadata)
+       VALUES ($1, 'payment_completed', $2, $3)`,
+      [
+        userId,
+        `Paid ${payment.amount} for ${payment.item_type}`,
+        JSON.stringify({ reference, itemId: payment.item_id }),
+      ]
+    );
+
+    res.json({
+      success: true,
       message: 'Payment verified successfully',
-      reference_id: reference_id 
+      status: 'completed',
+      reference,
+      amount: payment.amount,
     });
   } catch (err) {
-    console.error('Verify payment error:', err);
-    res.status(500).json({ error: 'Payment verification failed' });
+    console.error('Verify card payment error:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Get user payments
-router.get('/', verifyToken, async (req, res) => {
+// ============================================
+// BANK TRANSFER ROUTES
+// ============================================
+
+/**
+ * POST /api/payments/bank-transfer/initialize
+ * Initiate bank transfer (provides account details)
+ */
+router.post('/bank-transfer/initialize', verifyToken, async (req, res) => {
   try {
-    const result = await query(
-      'SELECT id, type, amount, currency, reference_id, status, payment_method, created_at FROM payments WHERE user_id = $1 ORDER BY created_at DESC',
-      [req.user.id]
+    const { itemType, itemId, amount, description } = req.body;
+    const userId = req.user.id;
+
+    if (!['course', 'membership'].includes(itemType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid itemType',
+      });
+    }
+
+    // Create payment record
+    const paymentReference = `BT_${uuidv4().substring(0, 12).toUpperCase()}`;
+    const paymentResult = await query(
+      `INSERT INTO payments 
+       (user_id, item_type, item_id, amount, reference, status, payment_method, metadata, created_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', 'bank_transfer', $6, NOW())
+       RETURNING id`,
+      [
+        userId,
+        itemType,
+        itemId,
+        amount,
+        paymentReference,
+        JSON.stringify({
+          description,
+          initiatedAt: new Date().toISOString(),
+          transferDeadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        }),
+      ]
     );
 
-    res.json(result.rows);
+    // Get business bank details
+    const bankResponse = await paystack.initializeBankTransfer(
+      null,
+      amount,
+      paymentReference,
+      { description }
+    );
+
+    res.json({
+      success: true,
+      reference: paymentReference,
+      method: 'bank_transfer',
+      bankDetails: bankResponse.bankDetails,
+      expiresAt: bankResponse.expiresAt,
+      instructions: [
+        `Transfer exactly ${amount} to the account below`,
+        `Use this reference in the transfer description: ${paymentReference}`,
+        `Transfer must be completed within 24 hours`,
+        `Payment will be automatically confirmed when we receive your transfer`,
+      ],
+    });
   } catch (err) {
-    console.error('Get payments error:', err);
-    res.status(500).json({ error: 'Failed to fetch payments' });
+    console.error('Initialize bank transfer error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/payments/bank-transfer/:reference/status
+ * Check status of bank transfer
+ */
+router.get('/bank-transfer/:reference/status', verifyToken, async (req, res) => {
+  try {
+    const { reference } = req.params;
+    const userId = req.user.id;
+
+    const paymentResult = await query(
+      `SELECT * FROM payments WHERE reference = $1 AND user_id = $2 AND payment_method = 'bank_transfer'`,
+      [reference, userId]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transfer not found',
+      });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    res.json({
+      success: true,
+      reference: payment.reference,
+      status: payment.status,
+      amount: payment.amount,
+      message:
+        payment.status === 'pending'
+          ? 'Waiting for transfer confirmation'
+          : `Transfer ${payment.status}`,
+    });
+  } catch (err) {
+    console.error('Get transfer status error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================
+// PAYMENT HISTORY
+// ============================================
+
+/**
+ * GET /api/payments/history
+ * Get user's payment history
+ */
+router.get('/history', verifyToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { limit = 20, offset = 0 } = req.query;
+
+    const result = await query(
+      `SELECT id, reference, item_type, amount, status, payment_method, created_at
+       FROM payments
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, parseInt(limit), parseInt(offset)]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      },
+    });
+  } catch (err) {
+    console.error('Get payment history error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/payments/:reference
+ * Get payment details
+ */
+router.get('/:reference', verifyToken, async (req, res) => {
+  try {
+    const { reference } = req.params;
+    const userId = req.user.id;
+
+    const result = await query(
+      `SELECT * FROM payments WHERE reference = $1 AND user_id = $2`,
+      [reference, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Payment not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      payment: result.rows[0],
+    });
+  } catch (err) {
+    console.error('Get payment error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================
+// WEBHOOK (for Paystack callbacks)
+// ============================================
+
+/**
+ * POST /api/payments/webhook
+ * Paystack webhook for payment confirmations
+ */
+router.post('/webhook', async (req, res) => {
+  try {
+    const signature = req.headers['x-paystack-signature'];
+    const body = req.rawBody || JSON.stringify(req.body);
+
+    // Verify webhook signature
+    if (!paystack.verifyWebhookSignature(signature, body)) {
+      console.warn('Invalid webhook signature');
+      return res.status(401).json({ success: false, error: 'Invalid signature' });
+    }
+
+    const event = req.body;
+
+    if (event.event === 'charge.success') {
+      const data = event.data;
+      const reference = data.reference;
+
+      // Update payment status in DB
+      const paymentResult = await query(
+        `SELECT * FROM payments WHERE reference = $1`,
+        [reference]
+      );
+
+      if (paymentResult.rows.length > 0) {
+        const payment = paymentResult.rows[0];
+
+        // Mark as completed
+        await query(
+          `UPDATE payments SET status = 'completed', updated_at = NOW() WHERE reference = $1`,
+          [reference]
+        );
+
+        // Grant access
+        if (payment.item_type === 'course') {
+          await query(
+            `INSERT INTO enrollments (user_id, course_id, enrollment_date)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (user_id, course_id) DO NOTHING`,
+            [payment.user_id, payment.item_id]
+          );
+        }
+
+        console.log(`Payment ${reference} confirmed via webhook`);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Webhook error:', err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

@@ -6,9 +6,9 @@ import '../config/service_locator.dart';
 class PaymentController extends GetxController {
   final paymentService = getIt<PaymentService>();
 
-  final membershipTiers = RxList<MembershipTierModel>();
-  final userPayments = RxList<Payment>();
-  final userMembership = Rx<UserMembership?>(null);
+  final membershipTiers = RxList<Map<String, dynamic>>();
+  final userPayments = RxList<Map<String, dynamic>>();
+  final userMembership = Rx<Map<String, dynamic>?>(null);
   final selectedTier = Rx<MembershipTierModel?>(null);
 
   final isLoading = false.obs;
@@ -40,18 +40,10 @@ class PaymentController extends GetxController {
     }
   }
 
-  Future<void> fetchUserPayments({
-    int page = 1,
-    int pageSize = 20,
-    String? status,
-  }) async {
+  Future<void> fetchUserPayments({int limit = 20}) async {
     try {
       errorMessage.value = '';
-      userPayments.value = await paymentService.getUserPayments(
-        page: page,
-        pageSize: pageSize,
-        status: status,
-      );
+      userPayments.value = await paymentService.getUserPayments(limit: limit);
     } catch (e) {
       errorMessage.value = 'Failed to load payment history';
     }
@@ -66,21 +58,16 @@ class PaymentController extends GetxController {
     }
   }
 
-  Future<bool> initiateCoursePayment(
-    String courseId, {
-    required String email,
-    required String phoneNumber,
-  }) async {
+  Future<bool> initiateCoursePayment(String courseId, double amount) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
       final response = await paymentService.initiateCoursePayment(
         courseId,
-        email: email,
-        phoneNumber: phoneNumber,
+        amount,
       );
 
-      if (response.link != null) {
+      if (response != null) {
         // Open Flutterwave link
         // You can use url_launcher package here
         return true;
@@ -95,23 +82,16 @@ class PaymentController extends GetxController {
     }
   }
 
-  Future<bool> initiateMembershipPayment(
-    String membershipTierId, {
-    required String email,
-    required String phoneNumber,
-    required String billingCycle,
-  }) async {
+  Future<bool> initiateMembershipPayment(String tierId, double amount) async {
     try {
       isLoading.value = true;
       errorMessage.value = '';
       final response = await paymentService.initiateMembershipPayment(
-        membershipTierId,
-        email: email,
-        phoneNumber: phoneNumber,
-        billingCycle: billingCycle,
+        tierId,
+        amount,
       );
 
-      if (response.link != null) {
+      if (response != null) {
         // Open Flutterwave link
         return true;
       }
@@ -131,7 +111,7 @@ class PaymentController extends GetxController {
       errorMessage.value = '';
       final payment = await paymentService.verifyPayment(reference);
 
-      if (payment.status == PaymentStatus.completed) {
+      if (payment != null && payment['status'] == 'completed') {
         Get.snackbar('Success', 'Payment successful!');
         await fetchUserPayments();
         await fetchUserMembership();

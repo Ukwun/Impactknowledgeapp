@@ -32,8 +32,11 @@ class AppTheme {
   static const Color textMuted = Color(0xFF94A3B8);
   static const Color textGray400 = Color(0xFFA3A8B3);
 
-  // ── Danger ───────────────────────────────────────────────────
+  // ── Status colors ───────────────────────────────────────────
   static const Color danger500 = Color(0xFFD64545);
+  static const Color success500 = Color(0xFF10B981);
+  static const Color warning500 = Color(0xFFF59E0B);
+  static const Color info500 = Color(0xFF3B82F6);
 
   // ── Gradients ────────────────────────────────────────────────
   static const LinearGradient darkGradient = LinearGradient(

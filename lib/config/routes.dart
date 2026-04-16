@@ -7,6 +7,12 @@ import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/courses/courses_list_screen.dart';
 import '../screens/courses/course_detail_screen.dart';
 import '../screens/courses/lesson_screen.dart';
+import '../screens/quiz/quiz_list_screen.dart';
+import '../screens/quiz/quiz_screen.dart';
+import '../screens/assignments/assignment_list_screen.dart';
+import '../screens/assignments/assignment_detail_screen.dart';
+import '../screens/events/event_list_screen.dart';
+import '../screens/events/event_detail_screen.dart';
 import '../screens/achievements/achievements_screen.dart';
 import '../screens/leaderboard/leaderboard_screen.dart';
 import '../screens/payments/membership_screen.dart';
@@ -30,6 +36,13 @@ class AppRoutes {
   static const String courses = '/courses';
   static const String courseDetail = '/course-detail';
   static const String lesson = '/lesson';
+  static const String quizzes = '/quizzes';
+  static const String quiz = '/quiz';
+  static const String quizResults = '/quiz-results';
+  static const String assignments = '/assignments';
+  static const String assignmentDetail = '/assignment-detail';
+  static const String events = '/events';
+  static const String eventDetail = '/event-detail';
   static const String achievements = '/achievements';
   static const String leaderboard = '/leaderboard';
   static const String membership = '/membership';
@@ -90,6 +103,37 @@ class AppPages {
     GetPage(
       name: AppRoutes.lesson,
       page: () => const LessonScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: '${AppRoutes.quizzes}/:courseId',
+      page: () => QuizListScreen(courseId: Get.parameters['courseId'] ?? ''),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.quiz,
+      page: () => QuizScreen(quizId: Get.arguments ?? ''),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: '${AppRoutes.assignments}/:courseId',
+      page: () =>
+          AssignmentListScreen(courseId: Get.parameters['courseId'] ?? ''),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.assignmentDetail,
+      page: () => AssignmentDetailScreen(assignmentId: Get.arguments ?? ''),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.events,
+      page: () => const EventListScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.eventDetail,
+      page: () => EventDetailScreen(eventId: Get.arguments ?? ''),
       transition: Transition.rightToLeft,
     ),
     GetPage(

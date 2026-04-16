@@ -4,6 +4,9 @@ import '../services/auth/auth_service.dart';
 import '../services/course/course_service.dart';
 import '../services/achievement/achievement_service.dart';
 import '../services/payment/payment_service.dart';
+import '../services/analytics_service.dart';
+import '../services/moderation/moderation_service.dart';
+import '../services/support/support_service.dart';
 import '../services/dashboard/dashboard_cache_service.dart';
 import '../services/dashboard/dashboard_service.dart';
 import '../services/dashboard/dashboard_sse_service.dart';
@@ -14,6 +17,11 @@ void setupServiceLocator() {
   // Register API Service
   if (!getIt.isRegistered<ApiService>()) {
     getIt.registerSingleton<ApiService>(ApiService());
+  }
+
+  // Register Analytics Service
+  if (!getIt.isRegistered<AnalyticsService>()) {
+    getIt.registerSingleton<AnalyticsService>(AnalyticsService());
   }
 
   // Register Services
@@ -38,6 +46,18 @@ void setupServiceLocator() {
   if (!getIt.isRegistered<PaymentService>()) {
     getIt.registerSingleton<PaymentService>(
       PaymentService(apiService: getIt<ApiService>()),
+    );
+  }
+
+  if (!getIt.isRegistered<ModerationService>()) {
+    getIt.registerSingleton<ModerationService>(
+      ModerationService(apiService: getIt<ApiService>()),
+    );
+  }
+
+  if (!getIt.isRegistered<SupportService>()) {
+    getIt.registerSingleton<SupportService>(
+      SupportService(apiService: getIt<ApiService>()),
     );
   }
 

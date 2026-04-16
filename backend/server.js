@@ -2,10 +2,15 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { initializeDatabase } = require('./src/database');
+const { globalLimiter, authLimiter, paymentLimiter } = require('./src/middleware/rateLimiter');
 const authRoutes = require('./src/routes/auth');
 const courseRoutes = require('./src/routes/courses');
 const achievementRoutes = require('./src/routes/achievements');
 const paymentRoutes = require('./src/routes/payments');
+const quizRoutes = require('./src/routes/quizzes');
+const assignmentRoutes = require('./src/routes/assignments');
+const eventRoutes = require('./src/routes/events');
+const adminRoutes = require('./src/routes/admin');
 
 const app = express();
 
@@ -13,6 +18,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Apply global rate limiter (all endpoints except /health)
+app.use(globalLimiter);
 
 // Log requests in development
 if (process.env.NODE_ENV !== 'production') {
@@ -49,15 +57,21 @@ app.post('/api/test', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/users', require('./src/routes/users'));
 app.use('/api/enrollments', require('./src/routes/enrollments'));
 app.use('/api/leaderboard', require('./src/routes/leaderboard'));
 app.use('/api/membership-tiers', require('./src/routes/membership'));
-app.use('/api/payments', paymentRoutes);
+app.use('/api/payments', paymentLimiter, paymentRoutes);
 app.use('/api/dashboard', require('./src/routes/dashboard'));
+app.use('/api/quizzes', quizRoutes);
+app.use('/api/assignments', assignmentRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/moderation', require('./src/routes/moderation'));
+app.use('/api/support', require('./src/routes/support'));
 
 // 404 handler
 app.use((req, res) => {
