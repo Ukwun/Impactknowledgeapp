@@ -21,6 +21,8 @@ import '../screens/leaderboard/leaderboard_screen.dart';
 import '../screens/payments/membership_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/community/community_screen.dart';
+import '../screens/classroom/facilitator_classroom_screen.dart';
+import '../screens/classroom/learner_classroom_screen.dart';
 import '../screens/notifications/notification_center_screen.dart';
 import '../screens/search/global_search_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
@@ -55,6 +57,8 @@ class AppRoutes {
   static const String membership = '/membership';
   static const String profile = '/profile';
   static const String community = '/community';
+  static const String learnerClassroom = '/learner-classroom';
+  static const String facilitatorClassroom = '/facilitator-classroom';
   static const String adminManagement = '/admin-management';
   static const String notifications = '/notifications';
   static const String globalSearch = '/global-search';
@@ -181,6 +185,16 @@ class AppPages {
     GetPage(
       name: AppRoutes.community,
       page: () => const CommunityScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.learnerClassroom,
+      page: () => const LearnerClassroomScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.facilitatorClassroom,
+      page: () => const FacilitatorClassroomScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(

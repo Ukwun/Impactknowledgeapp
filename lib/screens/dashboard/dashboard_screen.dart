@@ -196,6 +196,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // ── Stats Strip ─────────────────────────────────────────────────
             _buildStatsStrip(),
 
+            // ── Classroom Journey ───────────────────────────────────────────
+            _buildClassroomJourney(),
+
             // ── Assignments Due ──────────────────────────────────────────────
             _buildAssignmentsDue(),
 
@@ -420,6 +423,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
 
             const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClassroomJourney() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: AppTheme.darkCard(radius: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.auto_stories_outlined,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Guided Classroom',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Live sessions, tasks, and badges in one learning flow.',
+                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            OutlinedButton(
+              onPressed: () => Get.toNamed(AppRoutes.learnerClassroom),
+              child: const Text('Open'),
+            ),
           ],
         ),
       ),

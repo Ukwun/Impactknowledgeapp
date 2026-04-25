@@ -74,6 +74,13 @@ class FacilitatorDashboardScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             RoleActionTile(
+              title: 'Open Facilitator Classroom',
+              subtitle:
+                  'Run live sessions, monitor task progression, and track badges/certificates.',
+              icon: Icons.class_outlined,
+              onTap: () => Get.toNamed(AppRoutes.facilitatorClassroom),
+            ),
+            RoleActionTile(
               title: 'Create Course',
               subtitle: 'Launch authoring workflow for a new course.',
               icon: Icons.add_circle_outline,
