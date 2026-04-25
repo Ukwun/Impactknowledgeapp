@@ -46,12 +46,13 @@ class _SignupScreenState extends State<SignupScreen> {
   final _formKey1 = GlobalKey<FormState>();
   final _formKey2 = GlobalKey<FormState>();
   final _formKey3 = GlobalKey<FormState>();
+  Worker? _authStateWorker;
 
   @override
   void initState() {
     super.initState();
     final authController = Get.find<AuthController>();
-    ever(authController.isLoggedIn, (loggedIn) {
+    _authStateWorker = ever(authController.isLoggedIn, (loggedIn) {
       if (loggedIn && authController.currentUser.value != null) {
         Get.offAllNamed(AppRoutes.onboarding);
       }
@@ -60,6 +61,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   void dispose() {
+    _authStateWorker?.dispose();
     _firstNameCtrl.dispose();
     _lastNameCtrl.dispose();
     _emailCtrl.dispose();
@@ -112,7 +114,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _submit() async {
     final authController = Get.find<AuthController>();
-    await authController.signup(
+    final created = await authController.signup(
       _emailCtrl.text.trim(),
       _passwordCtrl.text,
       _firstNameCtrl.text.trim(),
@@ -124,6 +126,21 @@ class _SignupScreenState extends State<SignupScreen> {
           ? null
           : _institutionCtrl.text.trim(),
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (created && authController.currentUser.value != null) {
+      Get.offAllNamed(AppRoutes.onboarding);
+      return;
+    }
+
+    if (authController.errorMessage.value.isEmpty) {
+      setState(() {
+        _error = 'Unable to create account right now. Please try again.';
+      });
+    }
   }
 
   // ── helpers ───────────────────────────────────────────────────

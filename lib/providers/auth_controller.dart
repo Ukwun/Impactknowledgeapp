@@ -48,7 +48,7 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> signup(
+  Future<bool> signup(
     String email,
     String password,
     String firstName,
@@ -80,6 +80,7 @@ class AuthController extends GetxController {
       final response = await authService.signup(request);
       currentUser.value = response.user;
       isLoggedIn.value = true;
+      return true;
     } catch (e) {
       if (_isEmailAlreadyExistsError(e)) {
         try {
@@ -89,7 +90,7 @@ class AuthController extends GetxController {
           currentUser.value = loginResponse.user;
           isLoggedIn.value = true;
           errorMessage.value = '';
-          return;
+          return true;
         } catch (_) {
           // Fall through to user-facing duplicate-email message.
         }
@@ -97,6 +98,7 @@ class AuthController extends GetxController {
 
       errorMessage.value = _toUserFacingAuthError(e);
       isLoggedIn.value = false;
+      return false;
     } finally {
       isLoading.value = false;
     }
