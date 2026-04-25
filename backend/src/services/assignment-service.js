@@ -3,6 +3,58 @@ const ActivityService = require('./activity-service');
 
 class AssignmentService {
   /**
+   * List assignments, optionally filtered by course
+   */
+  static async listAssignments({ courseId, userId = null } = {}) {
+    try {
+      const params = [];
+      const conditions = [];
+
+      if (courseId) {
+        params.push(courseId);
+        conditions.push(`a.course_id = $${params.length}`);
+      }
+
+      const whereClause = conditions.length
+        ? `WHERE ${conditions.join(' AND ')}`
+        : '';
+
+      const result = await query(
+        `SELECT a.*, c.title as course_title
+         FROM assignments a
+         JOIN courses c ON c.id = a.course_id
+         ${whereClause}
+         ORDER BY a.created_at DESC`,
+        params
+      );
+
+      // Optionally annotate whether current user has submitted.
+      if (userId) {
+        const assignmentIds = result.rows.map((row) => row.id);
+        if (assignmentIds.length > 0) {
+          const submissionResult = await query(
+            `SELECT assignment_id, status
+             FROM submissions
+             WHERE user_id = $1 AND assignment_id = ANY($2)`,
+            [userId, assignmentIds]
+          );
+          const submissionMap = new Map(
+            submissionResult.rows.map((row) => [row.assignment_id, row.status])
+          );
+
+          result.rows.forEach((row) => {
+            row.submission_status = submissionMap.get(row.id) || 'not_submitted';
+          });
+        }
+      }
+
+      return { success: true, data: result.rows };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * Create a new assignment
    */
   static async createAssignment(assignmentData, instructorId, req) {
@@ -99,6 +151,143 @@ class AssignmentService {
       }
 
       return { success: true, data: assignment };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Get a submission by ID
+   */
+  static async getSubmissionById(submissionId, requesterId) {
+    try {
+      const result = await query(
+        `SELECT s.*, sg.points_earned, sg.feedback, sg.graded_at
+         FROM submissions s
+         LEFT JOIN submissions_grades sg ON sg.submission_id = s.id
+         WHERE s.id = $1`,
+        [submissionId]
+      );
+
+      if (result.rows.length === 0) {
+        throw new Error('Submission not found');
+      }
+
+      const submission = result.rows[0];
+
+      const accessResult = await query(
+        `SELECT a.created_by
+         FROM assignments a
+         WHERE a.id = $1`,
+        [submission.assignment_id]
+      );
+
+      const createdBy = accessResult.rows[0]?.created_by;
+      if (submission.user_id !== requesterId && createdBy !== requesterId) {
+        throw new Error('Unauthorized');
+      }
+
+      return { success: true, data: submission };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Get submission file URL with authorization checks
+   */
+  static async getSubmissionFile(submissionId, requesterId) {
+    try {
+      const submissionResult = await query(
+        `SELECT s.id, s.user_id, s.file_url, s.assignment_id, a.created_by
+         FROM submissions s
+         JOIN assignments a ON a.id = s.assignment_id
+         WHERE s.id = $1`,
+        [submissionId]
+      );
+
+      if (submissionResult.rows.length === 0) {
+        throw new Error('Submission not found');
+      }
+
+      const submission = submissionResult.rows[0];
+      const authorized =
+        submission.user_id === requesterId || submission.created_by === requesterId;
+
+      if (!authorized) {
+        throw new Error('Unauthorized');
+      }
+
+      if (!submission.file_url) {
+        throw new Error('No file attached to this submission');
+      }
+
+      return {
+        success: true,
+        data: {
+          submissionId,
+          fileUrl: submission.file_url,
+        },
+      };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Delete submission file with authorization checks
+   */
+  static async deleteSubmissionFile(submissionId, requesterId, req) {
+    try {
+      const submissionResult = await query(
+        `SELECT s.id, s.user_id, s.file_url, s.assignment_id, a.created_by
+         FROM submissions s
+         JOIN assignments a ON a.id = s.assignment_id
+         WHERE s.id = $1`,
+        [submissionId]
+      );
+
+      if (submissionResult.rows.length === 0) {
+        throw new Error('Submission not found');
+      }
+
+      const submission = submissionResult.rows[0];
+      const authorized =
+        submission.user_id === requesterId || submission.created_by === requesterId;
+
+      if (!authorized) {
+        throw new Error('Unauthorized');
+      }
+
+      if (!submission.file_url) {
+        return { success: true, data: { message: 'No file to delete' } };
+      }
+
+      await query(
+        `UPDATE submissions
+         SET file_url = NULL,
+             submission_date = CURRENT_TIMESTAMP,
+             status = CASE WHEN submission_text IS NULL OR submission_text = '' THEN 'draft' ELSE status END
+         WHERE id = $1`,
+        [submissionId]
+      );
+
+      await ActivityService.logActivity(
+        requesterId,
+        'ASSIGNMENT_FILE_DELETED',
+        'submission',
+        submissionId,
+        { assignmentId: submission.assignment_id },
+        req
+      );
+
+      return {
+        success: true,
+        data: {
+          submissionId,
+          deleted: true,
+        },
+      };
     } catch (err) {
       return { success: false, error: err.message };
     }

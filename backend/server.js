@@ -1,4 +1,7 @@
-require('dotenv').config();
+require('dotenv').config({
+  path: require('path').resolve(__dirname, '.env'),
+  override: true,
+});
 const express = require('express');
 const cors = require('cors');
 const { initializeDatabase } = require('./src/database');
@@ -16,7 +19,13 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf.toString();
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true }));
 
 // Apply global rate limiter (all endpoints except /health)
@@ -72,6 +81,11 @@ app.use('/api/events', eventRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/moderation', require('./src/routes/moderation'));
 app.use('/api/support', require('./src/routes/support'));
+app.use('/api/public', require('./src/routes/public'));
+app.use('/api/search', require('./src/routes/search'));
+app.use('/api/notifications', require('./src/routes/notifications'));
+app.use('/api/role-resources', require('./src/routes/role_resources'));
+app.use('/api/relationships', require('./src/routes/relationships'));
 
 // 404 handler
 app.use((req, res) => {

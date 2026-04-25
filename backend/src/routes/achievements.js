@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
+const { query } = require('../database');
 const AchievementService = require('../services/achievement-service');
 
 /**
@@ -182,6 +183,45 @@ router.put('/:id', verifyToken, async (req, res) => {
     }
 
     res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/achievements/:id - Delete achievement (admin only)
+ */
+router.delete('/:id', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only admins can delete achievements',
+      });
+    }
+
+    const achievementId = parseInt(req.params.id);
+
+    const deleted = await query(
+      'DELETE FROM achievements WHERE id = $1 RETURNING id, title',
+      [achievementId]
+    );
+
+    if (deleted.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Achievement not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Achievement deleted successfully',
+      data: deleted.rows[0],
+    });
   } catch (err) {
     res.status(500).json({
       success: false,

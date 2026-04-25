@@ -164,7 +164,7 @@ class ActivityService {
       const result = await query(
         `SELECT resource_type, COUNT(*) as count
          FROM user_activities
-         WHERE user_id = $1 AND activity_type IN ('START_LESSON', 'COMPLETE_LESSON')
+         WHERE user_id = $1 AND activity_type IN ('START_LESSON', 'COMPLETE_LESSON', 'COMPLETED_LESSON')
          GROUP BY resource_type`,
         [userId]
       );
@@ -246,9 +246,9 @@ class ActivityService {
       // Get completion counts
       const completionResult = await query(
         `SELECT
-          (SELECT COUNT(*) FROM user_activities WHERE user_id = $1 AND activity_type = 'COMPLETE_COURSE') as completed_courses,
-          (SELECT COUNT(*) FROM user_activities WHERE user_id = $1 AND activity_type = 'COMPLETE_LESSON') as completed_lessons,
-          (SELECT COUNT(*) FROM user_activities WHERE user_id = $1 AND activity_type = 'COMPLETE_QUIZ') as quiz_attempts
+          (SELECT COUNT(*) FROM user_activities WHERE user_id = $1 AND activity_type IN ('COMPLETE_COURSE', 'COURSE_COMPLETED')) as completed_courses,
+          (SELECT COUNT(*) FROM user_activities WHERE user_id = $1 AND activity_type IN ('COMPLETE_LESSON', 'COMPLETED_LESSON')) as completed_lessons,
+          (SELECT COUNT(*) FROM user_activities WHERE user_id = $1 AND activity_type IN ('COMPLETE_QUIZ', 'QUIZ_COMPLETED')) as quiz_attempts
          FROM user_activities LIMIT 1`,
         [userId]
       );

@@ -16,7 +16,7 @@ class PaystackService {
   /**
    * Make request to Paystack API
    */
-  private async makeRequest(method, endpoint, data = null) {
+  async makeRequest(method, endpoint, data = null) {
     return new Promise((resolve, reject) => {
       const options = {
         hostname: 'api.paystack.co',

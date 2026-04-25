@@ -76,6 +76,7 @@ async function initializeDatabase() {
         module_id INTEGER NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
         title VARCHAR(255) NOT NULL,
         description TEXT,
+        content_body TEXT,
         content_type VARCHAR(50),
         content_url VARCHAR(500),
         order_index INTEGER,
@@ -147,18 +148,38 @@ async function initializeDatabase() {
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id),
         type VARCHAR(50),
+        item_type VARCHAR(50),
+        item_id INTEGER,
         amount DECIMAL(10, 2),
         currency VARCHAR(10),
         reference_id VARCHAR(255) UNIQUE,
+        reference VARCHAR(255),
         flutterwave_id VARCHAR(255),
         status VARCHAR(50),
         payment_method VARCHAR(50),
+        metadata JSONB,
         email VARCHAR(255),
         phone_number VARCHAR(20),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    await pool.query(`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS item_type VARCHAR(50);
+    `).catch(() => {});
+    await pool.query(`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS item_id INTEGER;
+    `).catch(() => {});
+    await pool.query(`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS reference VARCHAR(255);
+    `).catch(() => {});
+    await pool.query(`
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS metadata JSONB;
+    `).catch(() => {});
+    await pool.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_reference_unique ON payments(reference);
+    `).catch(() => {});
 
     // Activity Tracking Tables
     await pool.query(`
@@ -351,6 +372,10 @@ async function initializeDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP;
     `).catch(() => {});
 
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token TEXT;
+    `).catch(() => {});
+
     // Events Management Tables
     await pool.query(`
       CREATE TABLE IF NOT EXISTS events (
@@ -528,6 +553,161 @@ async function initializeDatabase() {
 
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticket_id);
+    `).catch(() => {});
+
+    // In-app notifications
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'info',
+        action_url VARCHAR(500),
+        metadata JSONB,
+        is_read BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        read_at TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+    `).catch(() => {});
+
+    // Payment refunds ledger
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payment_refunds (
+        id SERIAL PRIMARY KEY,
+        payment_id INTEGER NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+        requested_by INTEGER NOT NULL REFERENCES users(id),
+        amount DECIMAL(10, 2) NOT NULL,
+        reason TEXT,
+        status VARCHAR(50) DEFAULT 'approved',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_payment_refunds_payment_id ON payment_refunds(payment_id);
+    `).catch(() => {});
+
+    // Parent-child and mentor-mentee relationship workflows
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS parent_child_links (
+        id SERIAL PRIMARY KEY,
+        parent_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        child_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        relationship VARCHAR(50) DEFAULT 'guardian',
+        is_active BOOLEAN DEFAULT true,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(parent_user_id, child_user_id)
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_parent_child_links_parent ON parent_child_links(parent_user_id, is_active);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_parent_child_links_child ON parent_child_links(child_user_id, is_active);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS mentor_mentee_links (
+        id SERIAL PRIMARY KEY,
+        mentor_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        mentee_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(50) DEFAULT 'active',
+        goals TEXT,
+        notes TEXT,
+        next_session_at TIMESTAMP,
+        last_session_at TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(mentor_user_id, mentee_user_id)
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mentor_mentee_links_mentor ON mentor_mentee_links(mentor_user_id, is_active);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_mentor_mentee_links_mentee ON mentor_mentee_links(mentee_user_id, is_active);
+    `).catch(() => {});
+
+    // Role-specific operational resources (mentor, circle_member, progress)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS role_resources (
+        id SERIAL PRIMARY KEY,
+        namespace VARCHAR(50) NOT NULL,
+        owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        status VARCHAR(50) DEFAULT 'active',
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_role_resources_ns_owner ON role_resources(namespace, owner_user_id);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_role_resources_status ON role_resources(status);
+    `).catch(() => {});
+
+    // Backfill rich content column for existing DBs
+    await pool.query(`
+      ALTER TABLE lessons ADD COLUMN IF NOT EXISTS content_body TEXT;
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE lessons ADD COLUMN IF NOT EXISTS is_published BOOLEAN DEFAULT true;
+    `).catch(() => {});
+
+    // Public content management tables
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS platform_partners (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        website_url VARCHAR(500),
+        logo_url VARCHAR(500),
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS testimonials (
+        id SERIAL PRIMARY KEY,
+        quote TEXT NOT NULL,
+        author_name VARCHAR(255) NOT NULL,
+        author_role VARCHAR(255),
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_platform_partners_active ON platform_partners(is_active);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_testimonials_active ON testimonials(is_active);
     `).catch(() => {});
 
     console.log('Database tables initialized successfully');

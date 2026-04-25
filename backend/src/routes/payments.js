@@ -7,6 +7,7 @@ const express = require('express');
 const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
 const PaystackService = require('../services/paystack_service');
+const NotificationTriggerService = require('../services/notification-trigger-service');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
@@ -123,6 +124,17 @@ router.post('/card/verify', verifyToken, async (req, res) => {
 
     const payment = paymentResult.rows[0];
 
+    // Idempotency: if already completed, return success without re-granting.
+    if (payment.status === 'completed') {
+      return res.json({
+        success: true,
+        message: 'Payment already verified',
+        status: 'completed',
+        reference,
+        amount: payment.amount,
+      });
+    }
+
     // Verify with Paystack
     const verification = await paystack.verifyCardPayment(reference);
 
@@ -138,9 +150,9 @@ router.post('/card/verify', verifyToken, async (req, res) => {
     await query(
       `UPDATE payments 
        SET status = 'completed', updated_at = NOW(),
-           metadata = jsonb_set(metadata, '{verifiedAt}', to_jsonb($2::text))
-       WHERE id = $3`,
-      [reference, new Date().toISOString(), payment.id]
+           metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{verifiedAt}', to_jsonb($1::text), true)
+       WHERE id = $2`,
+      [new Date().toISOString(), payment.id]
     );
 
     // Grant access based on item type
@@ -171,14 +183,38 @@ router.post('/card/verify', verifyToken, async (req, res) => {
 
     // Log transaction
     await query(
-      `INSERT INTO user_activities (user_id, activity_type, description, metadata)
-       VALUES ($1, 'payment_completed', $2, $3)`,
+      `INSERT INTO user_activities (user_id, activity_type, metadata)
+       VALUES ($1, 'PAYMENT_COMPLETED', $2)`,
       [
         userId,
-        `Paid ${payment.amount} for ${payment.item_type}`,
-        JSON.stringify({ reference, itemId: payment.item_id }),
+        JSON.stringify({
+          reference,
+          itemType: payment.item_type,
+          itemId: payment.item_id,
+          amount: payment.amount,
+        }),
       ]
     );
+
+    await NotificationTriggerService.notifyUser({
+      userId,
+      title: 'Payment Successful',
+      message:
+        payment.item_type === 'course'
+          ? 'Your payment was confirmed and course access is now active.'
+          : 'Your payment was confirmed and your membership is now active.',
+      type: 'payment',
+      actionUrl: payment.item_type === 'course' ? '/courses' : '/profile',
+      metadata: {
+        action: 'payment_completed',
+        resourceId: payment.id,
+        reference,
+        itemType: payment.item_type,
+        itemId: payment.item_id,
+        amount: payment.amount,
+      },
+      push: true,
+    });
 
     res.json({
       success: true,
@@ -337,10 +373,10 @@ router.get('/history', verifyToken, async (req, res) => {
 });
 
 /**
- * GET /api/payments/:reference
+ * GET /api/payments/details/:reference
  * Get payment details
  */
-router.get('/:reference', verifyToken, async (req, res) => {
+router.get('/details/:reference', verifyToken, async (req, res) => {
   try {
     const { reference } = req.params;
     const userId = req.user.id;
@@ -367,9 +403,106 @@ router.get('/:reference', verifyToken, async (req, res) => {
   }
 });
 
-// ============================================
-// WEBHOOK (for Paystack callbacks)
-// ============================================
+/**
+ * POST /api/payments/:reference/refund
+ * Refund a completed payment (admin only)
+ */
+router.post('/:reference/refund', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only admins can issue refunds',
+      });
+    }
+
+    const { reference } = req.params;
+    const { amount, reason } = req.body;
+
+    const paymentResult = await query(
+      `SELECT * FROM payments WHERE reference = $1`,
+      [reference]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Payment not found' });
+    }
+
+    const payment = paymentResult.rows[0];
+    if (payment.status !== 'completed') {
+      return res.status(400).json({
+        success: false,
+        error: 'Only completed payments can be refunded',
+      });
+    }
+
+    const refundAmount = amount ? Number(amount) : Number(payment.amount);
+    if (!refundAmount || refundAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid refund amount',
+      });
+    }
+
+    await query(
+      `UPDATE payments
+       SET status = 'refunded',
+           updated_at = NOW(),
+           metadata = jsonb_set(
+             COALESCE(metadata, '{}'::jsonb),
+             '{refund}',
+             to_jsonb($1::json),
+             true
+           )
+       WHERE id = $2`,
+      [
+        JSON.stringify({
+          refundedAt: new Date().toISOString(),
+          refundedBy: req.user.id,
+          amount: refundAmount,
+          reason: reason || null,
+        }),
+        payment.id,
+      ]
+    );
+
+    await query(
+      `INSERT INTO payment_refunds (payment_id, requested_by, amount, reason, status)
+       VALUES ($1, $2, $3, $4, 'approved')`,
+      [payment.id, req.user.id, refundAmount, reason || null]
+    );
+
+    await NotificationTriggerService.notifyUser({
+      userId: payment.user_id,
+      title: 'Payment Refunded',
+      message:
+        `Your payment ${reference} has been refunded.` +
+        (reason ? ` Reason: ${reason}` : ''),
+      type: 'payment',
+      actionUrl: '/payments',
+      metadata: {
+        action: 'payment_refund',
+        resourceId: payment.id,
+        reference,
+        amount: refundAmount,
+        reason: reason || null,
+      },
+      push: true,
+    });
+
+    res.json({
+      success: true,
+      message: 'Refund approved and recorded',
+      data: {
+        reference,
+        amount: refundAmount,
+      },
+    });
+  } catch (err) {
+    console.error('Refund payment error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * POST /api/payments/webhook
@@ -401,20 +534,22 @@ router.post('/webhook', async (req, res) => {
       if (paymentResult.rows.length > 0) {
         const payment = paymentResult.rows[0];
 
-        // Mark as completed
-        await query(
-          `UPDATE payments SET status = 'completed', updated_at = NOW() WHERE reference = $1`,
-          [reference]
-        );
-
-        // Grant access
-        if (payment.item_type === 'course') {
+        if (payment.status !== 'completed') {
+          // Mark as completed
           await query(
-            `INSERT INTO enrollments (user_id, course_id, enrollment_date)
-             VALUES ($1, $2, NOW())
-             ON CONFLICT (user_id, course_id) DO NOTHING`,
-            [payment.user_id, payment.item_id]
+            `UPDATE payments SET status = 'completed', updated_at = NOW() WHERE reference = $1`,
+            [reference]
           );
+
+          // Grant access
+          if (payment.item_type === 'course') {
+            await query(
+              `INSERT INTO enrollments (user_id, course_id, enrollment_date)
+               VALUES ($1, $2, NOW())
+               ON CONFLICT (user_id, course_id) DO NOTHING`,
+              [payment.user_id, payment.item_id]
+            );
+          }
         }
 
         console.log(`Payment ${reference} confirmed via webhook`);

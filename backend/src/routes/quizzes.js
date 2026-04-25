@@ -1,8 +1,40 @@
 const express = require('express');
+const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
 const QuizService = require('../services/quiz-service');
 
 const router = express.Router();
+
+/**
+ * GET /api/quizzes
+ * List quizzes, optional filter: ?courseId=<id>
+ */
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    const { courseId } = req.query;
+    const params = [];
+    const where = [];
+
+    if (courseId) {
+      params.push(courseId);
+      where.push(`course_id = $${params.length}`);
+    }
+
+    if (req.user.role === 'student') {
+      where.push('is_published = true');
+    }
+
+    const sql = `SELECT id, course_id, module_id, title, description, passing_score, time_limit_minutes, max_attempts, is_published, created_at
+                 FROM quizzes
+                 ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+                 ORDER BY created_at DESC`;
+    const result = await query(sql, params);
+
+    return res.json({ success: true, data: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * POST /api/quizzes

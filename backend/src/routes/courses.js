@@ -2,13 +2,17 @@ const express = require('express');
 const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
 const ActivityService = require('../services/activity-service');
+const NotificationTriggerService = require('../services/notification-trigger-service');
 
 const router = express.Router();
 
-// Helper: Check if user is instructor or admin
-async function isInstructor(userId) {
+// Helper: Check if user can manage course content.
+async function canManageCourses(userId) {
   const result = await query('SELECT role FROM users WHERE id = $1', [userId]);
-  return result.rows.length > 0 && (result.rows[0].role === 'instructor' || result.rows[0].role === 'admin');
+  return (
+    result.rows.length > 0 &&
+    ['instructor', 'facilitator', 'admin', 'school_admin'].includes(result.rows[0].role)
+  );
 }
 
 // ============================================
@@ -135,6 +139,208 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// Get course analytics (owner/admin)
+router.get('/:id/analytics', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const ownership = await query(
+      'SELECT instructor_id FROM courses WHERE id = $1',
+      [id]
+    );
+
+    if (ownership.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    const canAccess =
+      ownership.rows[0].instructor_id === req.user.id ||
+      ['admin', 'school_admin'].includes(req.user.role);
+
+    if (!canAccess) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const [enrollmentResult, completionResult, modulesResult, lessonsResult] = await Promise.all([
+      query('SELECT COUNT(*) as count FROM enrollments WHERE course_id = $1', [id]),
+      query(
+        `SELECT COUNT(*) as count
+         FROM enrollments
+         WHERE course_id = $1 AND completion_status = 'completed'`,
+        [id]
+      ),
+      query('SELECT COUNT(*) as count FROM modules WHERE course_id = $1', [id]),
+      query(
+        `SELECT COUNT(*) as count
+         FROM lessons l
+         JOIN modules m ON m.id = l.module_id
+         WHERE m.course_id = $1`,
+        [id]
+      ),
+    ]);
+
+    const totalEnrollments = parseInt(enrollmentResult.rows[0]?.count || 0);
+    const completed = parseInt(completionResult.rows[0]?.count || 0);
+
+    res.json({
+      success: true,
+      data: {
+        courseId: id,
+        totalEnrollments,
+        completedEnrollments: completed,
+        completionRate: totalEnrollments > 0 ? Number(((completed / totalEnrollments) * 100).toFixed(1)) : 0,
+        moduleCount: parseInt(modulesResult.rows[0]?.count || 0),
+        lessonCount: parseInt(lessonsResult.rows[0]?.count || 0),
+      }
+    });
+  } catch (err) {
+    console.error('Get course analytics error:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch course analytics' });
+  }
+});
+
+// Get course reports (owner/admin)
+router.get('/:id/reports', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const ownership = await query(
+      'SELECT instructor_id, title FROM courses WHERE id = $1',
+      [id]
+    );
+
+    if (ownership.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    const canAccess =
+      ownership.rows[0].instructor_id === req.user.id ||
+      ['admin', 'school_admin'].includes(req.user.role);
+
+    if (!canAccess) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const [progressSummary, recentEnrollments] = await Promise.all([
+      query(
+        `SELECT
+           COUNT(*) as total_learners,
+           AVG(progress_percentage)::numeric(5,2) as avg_progress,
+           COUNT(*) FILTER (WHERE completion_status = 'completed') as completed_learners,
+           COUNT(*) FILTER (WHERE completion_status = 'in_progress') as active_learners
+         FROM enrollments
+         WHERE course_id = $1`,
+        [id]
+      ),
+      query(
+        `SELECT e.user_id, e.progress_percentage, e.completion_status, e.enrollment_date
+         FROM enrollments e
+         WHERE e.course_id = $1
+         ORDER BY e.enrollment_date DESC
+         LIMIT 20`,
+        [id]
+      )
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        courseId: id,
+        courseTitle: ownership.rows[0].title,
+        summary: {
+          totalLearners: parseInt(progressSummary.rows[0]?.total_learners || 0),
+          avgProgress: Number(progressSummary.rows[0]?.avg_progress || 0),
+          completedLearners: parseInt(progressSummary.rows[0]?.completed_learners || 0),
+          activeLearners: parseInt(progressSummary.rows[0]?.active_learners || 0),
+        },
+        recentEnrollments: recentEnrollments.rows,
+      }
+    });
+  } catch (err) {
+    console.error('Get course reports error:', err);
+    res.status(500).json({ success: false, error: 'Failed to fetch reports' });
+  }
+});
+
+// Send course announcement to enrolled learners (owner/admin)
+router.post('/:id/announcements', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ success: false, error: 'Subject and message are required' });
+    }
+
+    const ownership = await query(
+      'SELECT instructor_id, title FROM courses WHERE id = $1',
+      [id]
+    );
+
+    if (ownership.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Course not found' });
+    }
+
+    const canAccess =
+      ownership.rows[0].instructor_id === req.user.id ||
+      ['admin', 'school_admin'].includes(req.user.role);
+
+    if (!canAccess) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const recipients = await query(
+      'SELECT user_id FROM enrollments WHERE course_id = $1',
+      [id]
+    );
+
+    const recipientIds = recipients.rows
+      .map((row) => parseInt(row.user_id, 10))
+      .filter((value) => Number.isFinite(value));
+
+    if (recipientIds.length > 0) {
+      await NotificationTriggerService.notifyMany({
+        userIds: recipientIds,
+        title: `Course Update: ${subject}`,
+        message,
+        type: 'course',
+        actionUrl: `/courses/${id}`,
+        metadata: {
+          action: 'course_announcement',
+          resourceId: parseInt(id, 10),
+        },
+        push: true,
+      });
+    }
+
+    await ActivityService.logActivity(
+      req.user.id,
+      'COURSE_ANNOUNCEMENT',
+      'course',
+      id,
+      {
+        subject,
+        message,
+        courseTitle: ownership.rows[0].title,
+        recipients: recipientIds.length,
+      },
+      req
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Announcement sent',
+      data: {
+        courseId: id,
+        recipients: recipientIds.length,
+      }
+    });
+  } catch (err) {
+    console.error('Create announcement error:', err);
+    res.status(500).json({ success: false, error: 'Failed to send announcement' });
+  }
+});
+
 // Get course modules
 router.get('/:courseId/modules', async (req, res) => {
   try {
@@ -159,7 +365,7 @@ router.get('/modules/:moduleId/lessons', async (req, res) => {
   try {
     const { moduleId } = req.params;
     const result = await query(
-      'SELECT id, module_id, title, description, content_type, content_url, order_index, duration_minutes FROM lessons WHERE module_id = $1 ORDER BY order_index ASC',
+      'SELECT id, module_id, title, description, content_body, content_type, content_url, order_index, duration_minutes FROM lessons WHERE module_id = $1 ORDER BY order_index ASC',
       [moduleId]
     );
 
@@ -199,10 +405,10 @@ router.get('/instructor/:instructorId/courses', async (req, res) => {
 // Create new course
 router.post('/', verifyToken, async (req, res) => {
   try {
-    // Check if user is instructor or admin
-    const isInstr = await isInstructor(req.user.id);
-    if (!isInstr) {
-      return res.status(403).json({ success: false, error: 'Only instructors can create courses' });
+    // Check if user can manage course content.
+    const allowed = await canManageCourses(req.user.id);
+    if (!allowed) {
+      return res.status(403).json({ success: false, error: 'Only facilitators/instructors/admins can create courses' });
     }
 
     const { title, description, category, price = 0, level, duration_hours, thumbnail_url } = req.body;
@@ -271,7 +477,7 @@ router.post('/:courseId/modules', verifyToken, async (req, res) => {
 router.post('/:courseId/lessons', verifyToken, async (req, res) => {
   try {
     const { courseId } = req.params;
-    const { moduleId, title, description, content_type, content_url, order_index, duration_minutes } = req.body;
+    const { moduleId, title, description, content_body, content_type, content_url, order_index, duration_minutes } = req.body;
 
     // Verify ownership
     const courseResult = await query(
@@ -284,10 +490,10 @@ router.post('/:courseId/lessons', verifyToken, async (req, res) => {
     }
 
     const result = await query(
-      `INSERT INTO lessons (module_id, title, description, content_type, content_url, order_index, duration_minutes, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-       RETURNING id, module_id, title, description, content_type, content_url, order_index, duration_minutes`,
-      [moduleId, title, description, content_type, content_url, order_index || 1, duration_minutes]
+      `INSERT INTO lessons (module_id, title, description, content_body, content_type, content_url, order_index, duration_minutes, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       RETURNING id, module_id, title, description, content_body, content_type, content_url, order_index, duration_minutes`,
+      [moduleId, title, description, content_body, content_type, content_url, order_index || 1, duration_minutes]
     );
 
     res.status(201).json({
@@ -313,7 +519,7 @@ router.put('/:id', verifyToken, async (req, res) => {
 
     // Verify ownership
     const courseResult = await query(
-      'SELECT instructor_id FROM courses WHERE id = $1',
+      'SELECT instructor_id, is_published, title FROM courses WHERE id = $1',
       [id]
     );
 
@@ -340,6 +546,50 @@ router.put('/:id', verifyToken, async (req, res) => {
        RETURNING id, title, description, category, price, level, duration_hours, is_published, updated_at`,
       [id, title, description, category, price, level, duration_hours, thumbnail_url, is_published]
     );
+
+    const wasPublished = !!courseResult.rows[0].is_published;
+    const nowPublished = !!result.rows[0].is_published;
+    const courseTitle = result.rows[0].title;
+
+    if (!wasPublished && nowPublished) {
+      await NotificationTriggerService.notifyAllActiveUsers({
+        title: 'New Course Published',
+        message: `${courseTitle} is now live and open for enrollment.`,
+        type: 'course',
+        actionUrl: `/courses/${id}`,
+        metadata: {
+          action: 'course_published',
+          resourceId: parseInt(id, 10),
+        },
+        push: true,
+      });
+    }
+
+    if (wasPublished && !nowPublished) {
+      const enrolledUsers = await query(
+        'SELECT user_id FROM enrollments WHERE course_id = $1',
+        [id]
+      );
+
+      const enrolledIds = enrolledUsers.rows
+        .map((row) => parseInt(row.user_id, 10))
+        .filter((value) => Number.isFinite(value));
+
+      if (enrolledIds.length > 0) {
+        await NotificationTriggerService.notifyMany({
+          userIds: enrolledIds,
+          title: 'Course Availability Update',
+          message: `${courseTitle} is temporarily unavailable while updates are made.`,
+          type: 'course',
+          actionUrl: '/courses',
+          metadata: {
+            action: 'course_unpublished',
+            resourceId: parseInt(id, 10),
+          },
+          push: false,
+        });
+      }
+    }
 
     // Log activity
     await ActivityService.logActivity(req.user.id, 'UPDATE_COURSE', 'course', id, { title: result.rows[0].title }, req);
@@ -397,20 +647,21 @@ router.put('/modules/:moduleId', verifyToken, async (req, res) => {
 router.put('/lessons/:lessonId', verifyToken, async (req, res) => {
   try {
     const { lessonId } = req.params;
-    const { title, description, content_type, content_url, order_index, duration_minutes } = req.body;
+    const { title, description, content_body, content_type, content_url, order_index, duration_minutes } = req.body;
 
     const result = await query(
       `UPDATE lessons SET
         title = COALESCE($2, title),
         description = COALESCE($3, description),
-        content_type = COALESCE($4, content_type),
-        content_url = COALESCE($5, content_url),
-        order_index = COALESCE($6, order_index),
-        duration_minutes = COALESCE($7, duration_minutes),
+        content_body = COALESCE($4, content_body),
+        content_type = COALESCE($5, content_type),
+        content_url = COALESCE($6, content_url),
+        order_index = COALESCE($7, order_index),
+        duration_minutes = COALESCE($8, duration_minutes),
         updated_at = CURRENT_TIMESTAMP
        WHERE id = $1
-       RETURNING id, module_id, title, description, content_type, content_url, order_index, duration_minutes`,
-      [lessonId, title, description, content_type, content_url, order_index, duration_minutes]
+       RETURNING id, module_id, title, description, content_body, content_type, content_url, order_index, duration_minutes`,
+      [lessonId, title, description, content_body, content_type, content_url, order_index, duration_minutes]
     );
 
     if (result.rows.length === 0) {

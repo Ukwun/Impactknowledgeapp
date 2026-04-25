@@ -6,7 +6,38 @@
 const express = require('express');
 const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
+const NotificationTriggerService = require('../services/notification-trigger-service');
 const router = express.Router();
+
+async function getContentOwnerId(contentType, contentId) {
+  if (contentType === 'course') {
+    const result = await query('SELECT instructor_id AS owner_id FROM courses WHERE id = $1', [contentId]);
+    return result.rows[0]?.owner_id || null;
+  }
+
+  if (contentType === 'lesson') {
+    const result = await query(
+      `SELECT c.instructor_id AS owner_id
+       FROM lessons l
+       JOIN modules m ON m.id = l.module_id
+       JOIN courses c ON c.id = m.course_id
+       WHERE l.id = $1`,
+      [contentId]
+    );
+    return result.rows[0]?.owner_id || null;
+  }
+
+  if (contentType === 'assignment') {
+    const result = await query('SELECT created_by AS owner_id FROM assignments WHERE id = $1', [contentId]);
+    return result.rows[0]?.owner_id || null;
+  }
+
+  if (contentType === 'user') {
+    return parseInt(contentId, 10) || null;
+  }
+
+  return null;
+}
 
 // ============================================
 // USER ENDPOINTS - Report/Flag Content
@@ -68,6 +99,31 @@ router.post('/flag', verifyToken, async (req, res) => {
        RETURNING id, created_at, status`,
       [user_id, content_type, content_id, reason, description || null]
     );
+
+    if (['copyright', 'inappropriate'].includes(reason)) {
+      const adminUsers = await query(
+        `SELECT id
+         FROM users
+         WHERE role = 'admin' AND COALESCE(is_active, true) = true`
+      );
+
+      const adminIds = adminUsers.rows.map((row) => parseInt(row.id, 10));
+      if (adminIds.length > 0) {
+        await NotificationTriggerService.notifyMany({
+          userIds: adminIds,
+          title: 'Moderation Escalation',
+          message: `A ${reason} report was submitted and escalated for urgent review.`,
+          type: 'moderation',
+          actionUrl: '/admin/moderation',
+          metadata: {
+            action: 'moderation_escalated',
+            resourceId: result.rows[0].id,
+            contentType: content_type,
+          },
+          push: true,
+        });
+      }
+    }
 
     res.status(201).json({
       success: true,
@@ -131,7 +187,7 @@ router.get('/admin/flags', verifyToken, async (req, res) => {
       });
     }
 
-    const { status = 'pending', limit = 20, offset = 0 } = req.query;
+    const { status = 'pending', contentType, reason, limit = 20, offset = 0 } = req.query;
 
     let query_str = `SELECT 
       cf.id, cf.reported_by, cf.content_type, cf.content_id, 
@@ -147,6 +203,16 @@ router.get('/admin/flags', verifyToken, async (req, res) => {
       params.push(status);
     }
 
+    if (contentType) {
+      query_str += ` AND cf.content_type = $${params.length + 1}`;
+      params.push(contentType);
+    }
+
+    if (reason) {
+      query_str += ` AND cf.reason = $${params.length + 1}`;
+      params.push(reason);
+    }
+
     query_str += ` ORDER BY cf.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(parseInt(limit), parseInt(offset));
 
@@ -158,6 +224,14 @@ router.get('/admin/flags', verifyToken, async (req, res) => {
     if (status && status !== 'all') {
       count_query += ` AND status = $${count_params.length + 1}`;
       count_params.push(status);
+    }
+    if (contentType) {
+      count_query += ` AND content_type = $${count_params.length + 1}`;
+      count_params.push(contentType);
+    }
+    if (reason) {
+      count_query += ` AND reason = $${count_params.length + 1}`;
+      count_params.push(reason);
     }
 
     const countResult = await query(count_query, count_params);
@@ -181,7 +255,7 @@ router.get('/admin/flags', verifyToken, async (req, res) => {
  * PUT /api/admin/moderation/flags/:flagId
  * Resolve a flag (approve/reject)
  */
-router.put('/admin/flags/:flagId', verifyToken, async (req, res) => {
+router.put('/admin/flags/:flagId(\\d+)', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({
@@ -191,12 +265,12 @@ router.put('/admin/flags/:flagId', verifyToken, async (req, res) => {
     }
 
     const { flagId } = req.params;
-    const { action, resolution_note } = req.body; // action: 'approved' or 'rejected'
+    const { action, resolution_note } = req.body; // action: 'approved', 'rejected', or 'pending'
 
-    if (!['approved', 'rejected'].includes(action)) {
+    if (!['approved', 'rejected', 'pending'].includes(action)) {
       return res.status(400).json({
         success: false,
-        error: 'Action must be "approved" or "rejected"'
+        error: 'Action must be "approved", "rejected", or "pending"'
       });
     }
 
@@ -205,7 +279,7 @@ router.put('/admin/flags/:flagId', verifyToken, async (req, res) => {
       `UPDATE content_flags 
        SET status = $1, resolved_by = $2, resolution_note = $3, resolved_at = NOW(), updated_at = NOW()
        WHERE id = $4
-       RETURNING id, status, content_type, content_id`,
+       RETURNING id, reported_by, status, content_type, content_id`,
       [action, req.user.id, resolution_note || null, flagId]
     );
 
@@ -240,7 +314,44 @@ router.put('/admin/flags/:flagId', verifyToken, async (req, res) => {
           await query(`UPDATE users SET is_active = false WHERE id = $1`, [content_id]);
           break;
       }
+
+      const ownerId = await getContentOwnerId(content_type, content_id);
+      if (ownerId && ownerId !== result.rows[0].reported_by) {
+        await NotificationTriggerService.notifyUser({
+          userId: ownerId,
+          title: 'Content Moderation Action',
+          message: 'One of your resources was restricted after moderation review.',
+          type: 'moderation',
+          actionUrl: '/notifications',
+          metadata: {
+            action: 'moderation_content_restricted',
+            resourceId: content_id,
+            contentType: content_type,
+            flagId: result.rows[0].id,
+          },
+          push: true,
+        });
+      }
     }
+
+    await NotificationTriggerService.notifyUser({
+      userId: result.rows[0].reported_by,
+      title: 'Moderation Update',
+      message:
+        action === 'approved'
+          ? 'Your report was approved and action was taken.'
+          : action === 'rejected'
+            ? 'Your report was reviewed and rejected.'
+            : 'Your report status was moved back to pending review.',
+      type: 'moderation',
+      actionUrl: '/notifications',
+      metadata: {
+        action: 'moderation_resolution',
+        resourceId: result.rows[0].id,
+        resolution: action,
+      },
+      push: true,
+    });
 
     res.json({
       success: true,
@@ -250,6 +361,79 @@ router.put('/admin/flags/:flagId', verifyToken, async (req, res) => {
     });
   } catch (err) {
     console.error('Resolve flag error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PUT /api/moderation/admin/flags/bulk
+ * Bulk resolve flags in a single moderation action.
+ */
+router.put('/admin/flags/bulk', verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        error: 'Only admins can resolve flags'
+      });
+    }
+
+    const { flagIds = [], action, resolution_note } = req.body;
+
+    if (!Array.isArray(flagIds) || flagIds.length === 0) {
+      return res.status(400).json({ success: false, error: 'flagIds is required' });
+    }
+
+    if (!['approved', 'rejected', 'pending'].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Action must be "approved", "rejected", or "pending"'
+      });
+    }
+
+    const resolved = await query(
+      `UPDATE content_flags
+       SET status = $1,
+           resolved_by = $2,
+           resolution_note = $3,
+           resolved_at = NOW(),
+           updated_at = NOW()
+       WHERE id = ANY($4::int[])
+       RETURNING id, reported_by`,
+      [action, req.user.id, resolution_note || null, flagIds]
+    );
+
+    await Promise.all(
+      resolved.rows.map((flag) =>
+        query(
+          `INSERT INTO moderation_actions (flag_id, admin_id, action, details)
+           VALUES ($1, $2, $3, $4)`,
+          [flag.id, req.user.id, action, resolution_note || null]
+        )
+      )
+    );
+
+    await Promise.all(
+      resolved.rows.map((flag) =>
+        NotificationTriggerService.notifyUser({
+          userId: flag.reported_by,
+          title: 'Moderation Update',
+          message: `Your report was updated to ${action}.`,
+          type: 'moderation',
+          actionUrl: '/notifications',
+          metadata: { action: 'moderation_resolution', resourceId: flag.id, resolution: action },
+          push: true,
+        })
+      )
+    );
+
+    res.json({
+      success: true,
+      message: `Updated ${resolved.rowCount} flags to ${action}`,
+      updatedCount: resolved.rowCount,
+    });
+  } catch (err) {
+    console.error('Bulk resolve flags error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

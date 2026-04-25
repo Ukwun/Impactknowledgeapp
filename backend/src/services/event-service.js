@@ -395,6 +395,45 @@ class EventService {
   }
 
   /**
+   * Get event analytics (event creator/admin view)
+   */
+  static async getEventAnalytics(eventId, userId) {
+    try {
+      const eventCheck = await query(
+        'SELECT created_by FROM events WHERE id = $1',
+        [eventId]
+      );
+
+      if (eventCheck.rows.length === 0) {
+        throw new Error('Event not found');
+      }
+
+      if (eventCheck.rows[0].created_by !== userId) {
+        throw new Error('Unauthorized');
+      }
+
+      const result = await query(
+        `SELECT
+           e.id,
+           e.title,
+           e.capacity,
+           COUNT(er.id) as registrations_count,
+           COUNT(CASE WHEN er.attendance_status = 'attended' THEN 1 END) as attended_count,
+           COUNT(CASE WHEN er.attendance_status = 'registered' THEN 1 END) as registered_count
+         FROM events e
+         LEFT JOIN event_registrations er ON er.event_id = e.id
+         WHERE e.id = $1
+         GROUP BY e.id`,
+        [eventId]
+      );
+
+      return { success: true, data: result.rows[0] || {} };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
    * Get user's registered events
    */
   static async getUserEvents(userId) {

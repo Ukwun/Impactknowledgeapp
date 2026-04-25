@@ -128,7 +128,17 @@ class AdminService {
   static async changeUserRole(userId, newRole, adminId, req) {
     try {
       // Validate role
-      const validRoles = ['student', 'instructor', 'facilitator', 'admin'];
+      const validRoles = [
+        'student',
+        'parent',
+        'facilitator',
+        'instructor',
+        'school_admin',
+        'uni_member',
+        'circle_member',
+        'mentor',
+        'admin',
+      ];
       if (!validRoles.includes(newRole)) {
         throw new Error('Invalid role');
       }
@@ -229,10 +239,10 @@ class AdminService {
 
       // Activity by type
       const activityByTypeResult = await query(
-        `SELECT action_type, COUNT(*) as count
+        `SELECT activity_type, COUNT(*) as count
          FROM user_activities
          WHERE created_at >= NOW() - INTERVAL '${daysBack} days'
-         GROUP BY action_type
+        GROUP BY activity_type
          ORDER BY count DESC`
       );
 
@@ -338,24 +348,25 @@ class AdminService {
     try {
       // Total revenue
       const totalRevenueResult = await query(
-        `SELECT SUM(amount) as total FROM payments WHERE status = $1`,
-        ['success']
+        `SELECT COALESCE(SUM(amount), 0) as total
+         FROM payments
+         WHERE status IN ('completed', 'success')`
       );
 
-      // Revenue by membership tier
-      const revenueByTierResult = await query(
-        `SELECT mt.name, SUM(p.amount) as total
-         FROM payments p
-         JOIN membership_tiers mt ON p.membership_tier_id = mt.id
-         WHERE p.status = $1
-         GROUP BY mt.name`,
-        ['success']
+      // Revenue grouped by purchased item type
+      const revenueByTypeResult = await query(
+        `SELECT COALESCE(item_type, 'unknown') as item_type, COALESCE(SUM(amount), 0) as total
+         FROM payments
+         WHERE status IN ('completed', 'success')
+         GROUP BY COALESCE(item_type, 'unknown')
+         ORDER BY total DESC`
       );
 
       // Payment count
       const paymentCountResult = await query(
-        `SELECT COUNT(*) as count FROM payments WHERE status = $1`,
-        ['success']
+        `SELECT COUNT(*) as count
+         FROM payments
+         WHERE status IN ('completed', 'success')`
       );
 
       // Failed payments
@@ -366,8 +377,9 @@ class AdminService {
 
       // Average transaction
       const avgTransactionResult = await query(
-        `SELECT AVG(amount) as average FROM payments WHERE status = $1`,
-        ['success']
+        `SELECT AVG(amount) as average
+         FROM payments
+         WHERE status IN ('completed', 'success')`
       );
 
       return {
@@ -379,7 +391,7 @@ class AdminService {
           averageTransaction: parseFloat(
             avgTransactionResult.rows[0]?.average || 0
           ).toFixed(2),
-          revenueByTier: revenueByTierResult.rows,
+          revenueByType: revenueByTypeResult.rows,
         },
       };
     } catch (err) {
@@ -491,13 +503,19 @@ class AdminService {
    */
   static async createMembershipTier(tierData, adminId, req) {
     try {
-      const { name, description, price, features, duration_months } = tierData;
+      const {
+        name,
+        description,
+        monthlyPrice,
+        annualPrice,
+        benefits,
+      } = tierData;
 
       const result = await query(
-        `INSERT INTO membership_tiers (name, description, price, features, duration_months)
+        `INSERT INTO membership_tiers (name, description, monthly_price, annual_price, benefits)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING *`,
-        [name, description, price, features, duration_months]
+        [name, description, monthlyPrice, annualPrice, benefits]
       );
 
       await ActivityService.logActivity(
@@ -505,7 +523,7 @@ class AdminService {
         'MEMBERSHIP_TIER_CREATED',
         'membership_tier',
         result.rows[0].id,
-        { name, price },
+        { name, monthlyPrice, annualPrice },
         req
       );
 
@@ -521,7 +539,7 @@ class AdminService {
   static async getMembershipTiers() {
     try {
       const result = await query(
-        'SELECT * FROM membership_tiers ORDER BY price ASC'
+        'SELECT * FROM membership_tiers ORDER BY monthly_price ASC'
       );
 
       return { success: true, data: result.rows };
@@ -539,18 +557,18 @@ class AdminService {
       const values = [];
       let paramCount = 1;
 
-      const allowedFields = [
-        'name',
-        'description',
-        'price',
-        'features',
-        'duration_months',
-        'is_active',
-      ];
+      const fieldMap = {
+        name: 'name',
+        description: 'description',
+        monthlyPrice: 'monthly_price',
+        annualPrice: 'annual_price',
+        benefits: 'benefits',
+        isActive: 'is_active',
+      };
 
       Object.keys(updates).forEach((key) => {
-        if (allowedFields.includes(key)) {
-          fields.push(`${key} = $${paramCount}`);
+        if (fieldMap[key]) {
+          fields.push(`${fieldMap[key]} = $${paramCount}`);
           values.push(updates[key]);
           paramCount++;
         }
@@ -581,6 +599,37 @@ class AdminService {
       );
 
       return { success: true, data: result.rows[0] };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  /**
+   * Delete membership tier
+   */
+  static async deleteMembershipTier(tierId, adminId, req) {
+    try {
+      const existing = await query(
+        'SELECT id, name FROM membership_tiers WHERE id = $1',
+        [tierId]
+      );
+
+      if (existing.rows.length === 0) {
+        throw new Error('Membership tier not found');
+      }
+
+      await query('DELETE FROM membership_tiers WHERE id = $1', [tierId]);
+
+      await ActivityService.logActivity(
+        adminId,
+        'MEMBERSHIP_TIER_DELETED',
+        'membership_tier',
+        tierId,
+        { name: existing.rows[0].name },
+        req
+      );
+
+      return { success: true, data: { id: tierId } };
     } catch (err) {
       return { success: false, error: err.message };
     }
