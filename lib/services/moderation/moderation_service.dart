@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../api/api_service.dart';
 import 'package:logger/logger.dart';
 
@@ -29,7 +28,7 @@ class ModerationService {
       );
 
       _logger.i('Content flagged: $contentId');
-      return response.data;
+      return Map<String, dynamic>.from(response as Map);
     } catch (e) {
       _logger.e('Error flagging content: $e');
       rethrow;
@@ -48,7 +47,7 @@ class ModerationService {
       );
 
       _logger.i('Retrieved user flags');
-      return response.data;
+      return Map<String, dynamic>.from(response as Map);
     } catch (e) {
       _logger.e('Error getting user flags: $e');
       rethrow;
@@ -68,7 +67,7 @@ class ModerationService {
       );
 
       _logger.i('Retrieved admin flags');
-      return response.data;
+      return Map<String, dynamic>.from(response as Map);
     } catch (e) {
       _logger.e('Error getting admin flags: $e');
       rethrow;
@@ -88,7 +87,7 @@ class ModerationService {
       );
 
       _logger.i('Flag resolved: $flagId -> $action');
-      return response.data;
+      return Map<String, dynamic>.from(response as Map);
     } catch (e) {
       _logger.e('Error resolving flag: $e');
       rethrow;
@@ -101,7 +100,7 @@ class ModerationService {
       final response = await _apiService.get('/moderation/admin/stats');
 
       _logger.i('Retrieved moderation statistics');
-      return response.data;
+      return Map<String, dynamic>.from(response as Map);
     } catch (e) {
       _logger.e('Error getting moderation stats: $e');
       rethrow;

@@ -3,10 +3,13 @@ import '../screens/splash/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
+import '../screens/admin/admin_management_screen.dart';
 import '../screens/dashboard/dashboard_screen.dart';
 import '../screens/courses/courses_list_screen.dart';
 import '../screens/courses/course_detail_screen.dart';
 import '../screens/courses/lesson_screen.dart';
+import '../screens/courses/course_management_screen.dart';
+import '../screens/courses/lesson_content_editor_screen.dart';
 import '../screens/quiz/quiz_list_screen.dart';
 import '../screens/quiz/quiz_screen.dart';
 import '../screens/assignments/assignment_list_screen.dart';
@@ -17,6 +20,9 @@ import '../screens/achievements/achievements_screen.dart';
 import '../screens/leaderboard/leaderboard_screen.dart';
 import '../screens/payments/membership_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/community/community_screen.dart';
+import '../screens/notifications/notification_center_screen.dart';
+import '../screens/search/global_search_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/onboarding/landing_screen.dart';
 import '../providers/auth_controller.dart';
@@ -34,6 +40,7 @@ class AppRoutes {
   // App Routes
   static const String dashboard = '/dashboard';
   static const String courses = '/courses';
+  static const String courseManagement = '/course-management';
   static const String courseDetail = '/course-detail';
   static const String lesson = '/lesson';
   static const String quizzes = '/quizzes';
@@ -47,6 +54,11 @@ class AppRoutes {
   static const String leaderboard = '/leaderboard';
   static const String membership = '/membership';
   static const String profile = '/profile';
+  static const String community = '/community';
+  static const String adminManagement = '/admin-management';
+  static const String notifications = '/notifications';
+  static const String globalSearch = '/global-search';
+  static const String lessonEditor = '/lesson-editor';
 }
 
 class AppPages {
@@ -93,6 +105,16 @@ class AppPages {
     GetPage(
       name: AppRoutes.courses,
       page: () => const CoursesListScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.courseManagement,
+      page: () => const CourseManagementScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.lessonEditor,
+      page: () => const LessonContentEditorScreen(),
       transition: Transition.rightToLeft,
     ),
     GetPage(
@@ -154,6 +176,26 @@ class AppPages {
     GetPage(
       name: AppRoutes.profile,
       page: () => const ProfileScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.community,
+      page: () => const CommunityScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.notifications,
+      page: () => const NotificationCenterScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.globalSearch,
+      page: () => const GlobalSearchScreen(),
+      transition: Transition.rightToLeft,
+    ),
+    GetPage(
+      name: AppRoutes.adminManagement,
+      page: () => const AdminManagementScreen(),
       transition: Transition.rightToLeft,
     ),
   ];

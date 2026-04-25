@@ -3,9 +3,40 @@ import 'package:get/get.dart';
 
 import '../../config/app_theme.dart';
 import '../../config/routes.dart';
+import '../../config/service_locator.dart';
+import '../../services/api/api_service.dart';
 
-class LandingScreen extends StatelessWidget {
+class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
+
+  @override
+  State<LandingScreen> createState() => _LandingScreenState();
+}
+
+class _LandingScreenState extends State<LandingScreen> {
+  late final Future<Map<String, dynamic>> _landingContent;
+
+  @override
+  void initState() {
+    super.initState();
+    _landingContent = _loadLandingContent();
+  }
+
+  Future<Map<String, dynamic>> _loadLandingContent() async {
+    try {
+      final response = await getIt<ApiService>().getLandingContent();
+      if (response['success'] == true &&
+          response['data'] is Map<String, dynamic>) {
+        return response['data'] as Map<String, dynamic>;
+      }
+    } catch (_) {}
+
+    return {
+      'impactNumbers': {'learners': 0, 'courses': 0, 'institutions': 0},
+      'partners': <Map<String, dynamic>>[],
+      'testimonials': <Map<String, dynamic>>[],
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +136,27 @@ class LandingScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    const _MetricRow(),
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _landingContent,
+                      builder: (context, snapshot) {
+                        final data =
+                            snapshot.data ??
+                            {
+                              'impactNumbers': {
+                                'learners': 0,
+                                'courses': 0,
+                                'institutions': 0,
+                              },
+                            };
+                        final impact =
+                            data['impactNumbers'] as Map<String, dynamic>;
+                        return _MetricRow(
+                          learners: impact['learners'] ?? 0,
+                          courses: impact['courses'] ?? 0,
+                          institutions: impact['institutions'] ?? 0,
+                        );
+                      },
+                    ),
                     const SizedBox(height: 28),
                     _SectionCard(
                       title: 'Our Ecosystem',
@@ -157,34 +208,80 @@ class LandingScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    _SectionCard(
-                      title: 'Real Stories, Real Impact',
-                      subtitle:
-                          'Learners, mentors, and founders use this platform to move from learning to outcomes.',
-                      children: const [
-                        _QuoteCard(
-                          quote:
-                              'I moved from theory to execution with practical pathways and mentorship.',
-                          author: 'University Member',
-                        ),
-                        SizedBox(height: 10),
-                        _QuoteCard(
-                          quote:
-                              'The role-specific dashboard helps me focus on what matters each week.',
-                          author: 'Facilitator',
-                        ),
-                      ],
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _landingContent,
+                      builder: (context, snapshot) {
+                        final data = snapshot.data ?? {};
+                        final testimonials =
+                            (data['testimonials'] as List?)
+                                ?.map(
+                                  (e) => Map<String, dynamic>.from(e as Map),
+                                )
+                                .toList() ??
+                            <Map<String, dynamic>>[];
+
+                        return _SectionCard(
+                          title: 'Real Stories, Real Impact',
+                          subtitle:
+                              'Learners, mentors, and founders use this platform to move from learning to outcomes.',
+                          children: testimonials.isEmpty
+                              ? const [
+                                  _QuoteCard(
+                                    quote:
+                                        'Impact stories will appear here as learner outcomes are published.',
+                                    author: 'ImpactKnowledge',
+                                  ),
+                                ]
+                              : testimonials
+                                    .take(3)
+                                    .map(
+                                      (t) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: _QuoteCard(
+                                          quote: t['quote']?.toString() ?? '',
+                                          author:
+                                              t['author_name']?.toString() ??
+                                              t['authorName']?.toString() ??
+                                              'Learner',
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
-                    _SectionCard(
-                      title: 'Trusted by Leaders',
-                      subtitle:
-                          'Backed by institutional partners and an ecosystem built for scale.',
-                      children: const [
-                        _Pill(label: 'NCDF'),
-                        _Pill(label: 'London School of Social Enterprise'),
-                        _Pill(label: 'Schools, Mentors, Community Partners'),
-                      ],
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: _landingContent,
+                      builder: (context, snapshot) {
+                        final data = snapshot.data ?? {};
+                        final partners =
+                            (data['partners'] as List?)
+                                ?.map(
+                                  (e) => Map<String, dynamic>.from(e as Map),
+                                )
+                                .toList() ??
+                            <Map<String, dynamic>>[];
+
+                        return _SectionCard(
+                          title: 'Trusted by Leaders',
+                          subtitle:
+                              'Backed by institutional partners and an ecosystem built for scale.',
+                          children: partners.isEmpty
+                              ? const [_Pill(label: 'Partner data unavailable')]
+                              : partners
+                                    .take(6)
+                                    .map(
+                                      (p) => _Pill(
+                                        label:
+                                            p['name']?.toString() ?? 'Partner',
+                                      ),
+                                    )
+                                    .toList(),
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                     SizedBox(
@@ -471,7 +568,15 @@ class _BlurBubble extends StatelessWidget {
 }
 
 class _MetricRow extends StatelessWidget {
-  const _MetricRow();
+  final int learners;
+  final int courses;
+  final int institutions;
+
+  const _MetricRow({
+    required this.learners,
+    required this.courses,
+    required this.institutions,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -495,9 +600,21 @@ class _MetricRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _MetricItem(value: '50K+', label: 'Learners', valueStyle: style),
-          _MetricItem(value: '200+', label: 'Courses', valueStyle: style),
-          _MetricItem(value: '95%', label: 'Engagement', valueStyle: style),
+          _MetricItem(
+            value: '${learners.toString()}+',
+            label: 'Learners',
+            valueStyle: style,
+          ),
+          _MetricItem(
+            value: '${courses.toString()}+',
+            label: 'Courses',
+            valueStyle: style,
+          ),
+          _MetricItem(
+            value: '${institutions.toString()}+',
+            label: 'Institutions',
+            valueStyle: style,
+          ),
         ],
       ),
     );

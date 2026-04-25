@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../config/app_theme.dart';
 import '../../providers/assignment_controller.dart';
 
@@ -16,7 +17,7 @@ class AssignmentDetailScreen extends StatefulWidget {
 class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
   late AssignmentController _assignmentController;
   late TextEditingController _answerController;
-  List<String> _selectedFiles = [];
+  final List<String> _selectedFiles = [];
   Map<String, dynamic>? _assignment;
 
   @override
@@ -29,6 +30,12 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
 
   Future<void> _loadAssignmentDetail() async {
     _assignment = _assignmentController.getAssignmentById(widget.assignmentId);
+    final submissionId =
+        _assignment?['submissionId']?.toString() ??
+        _assignment?['submission_id']?.toString();
+    if (submissionId != null && submissionId.isNotEmpty) {
+      await _assignmentController.getSubmission(submissionId);
+    }
     setState(() {});
   }
 
@@ -303,7 +310,7 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
                                   ],
                                 ),
                               );
-                            }).toList(),
+                            }),
                           ],
                         ],
                       ),
@@ -359,6 +366,8 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
                         height: 1.6,
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    _buildSubmissionFileActions(),
                   ],
                 ),
               ),
@@ -389,6 +398,94 @@ class _AssignmentDetailScreenState extends State<AssignmentDetailScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  Future<void> _openSubmissionFile(String submissionId) async {
+    final url = await _assignmentController.resolveSubmissionFileUrl(
+      submissionId,
+    );
+
+    if (url == null || url.isEmpty) {
+      Get.snackbar(
+        'File unavailable',
+        'Unable to resolve file URL for this submission.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      Get.snackbar(
+        'Invalid file URL',
+        'The file URL is not valid.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched) {
+      Get.snackbar(
+        'Open failed',
+        'Could not open the file. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Widget _buildSubmissionFileActions() {
+    final submission = _assignmentController.currentSubmission.value;
+    final submissionId =
+        submission?['id']?.toString() ??
+        _assignment?['submissionId']?.toString() ??
+        _assignment?['submission_id']?.toString();
+    final fileUrl =
+        submission?['fileUrl']?.toString() ??
+        submission?['file_url']?.toString() ??
+        _assignment?['fileUrl']?.toString() ??
+        _assignment?['file_url']?.toString();
+
+    if (submissionId == null ||
+        submissionId.isEmpty ||
+        fileUrl == null ||
+        fileUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Wrap(
+      spacing: 10,
+      runSpacing: 8,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () async {
+            await _openSubmissionFile(submissionId);
+          },
+          icon: const Icon(Icons.download_outlined),
+          label: const Text('Open or Download File'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () async {
+            final ok = await _assignmentController.deleteSubmissionFile(
+              submissionId,
+            );
+            if (ok) {
+              setState(() {
+                _assignment?.remove('fileUrl');
+                _assignment?.remove('file_url');
+              });
+              Get.snackbar(
+                'Deleted',
+                'Submission file removed',
+                snackPosition: SnackPosition.BOTTOM,
+              );
+            }
+          },
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Delete File'),
+        ),
+      ],
+    );
   }
 }
 

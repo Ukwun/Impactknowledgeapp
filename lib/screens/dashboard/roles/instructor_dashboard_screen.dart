@@ -20,8 +20,10 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
   late AssignmentController assignmentController;
 
   int _totalStudents = 0;
-  double _avgProgress = 0;
-  int _pendingGrading = 0;
+  double _avgRating = 0;
+  int _publishedCourses = 0;
+  int _draftCourses = 0;
+  int _totalLessons = 0;
 
   @override
   void initState() {
@@ -34,23 +36,44 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
   }
 
   Future<void> _loadInstructorData() async {
-    // Load instructor's courses
-    courseController.getInstructorCourses();
+    // Load courses and enrolled stats.
+    await courseController.fetchAllCourses();
+    await courseController.fetchUserEnrollments();
 
     // Calculate stats
     _calculateStats();
   }
 
   void _calculateStats() {
-    // Sum up students across all instructor's courses
     int totalStudents = 0;
-    double totalProgress = 0;
+    int publishedCourses = 0;
+    int draftCourses = 0;
+    int totalLessons = 0;
+    double ratingSum = 0;
+    int ratingCount = 0;
 
-    // This would come from the API in a real app
-    // For now, using placeholder logic
+    for (final course in courseController.courses) {
+      totalStudents += course.enrollmentCount;
+      totalLessons += course.lessonCount;
+
+      if (course.isPublished) {
+        publishedCourses++;
+      } else {
+        draftCourses++;
+      }
+
+      if (course.averageRating != null) {
+        ratingSum += course.averageRating!;
+        ratingCount++;
+      }
+    }
+
     setState(() {
       _totalStudents = totalStudents;
-      _avgProgress = totalProgress;
+      _publishedCourses = publishedCourses;
+      _draftCourses = draftCourses;
+      _totalLessons = totalLessons;
+      _avgRating = ratingCount > 0 ? (ratingSum / ratingCount) : 0;
     });
   }
 
@@ -122,7 +145,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
             children: [
               _MetricCard(
                 icon: Icons.school_outlined,
-                value: '${courseController.instructorCourses.length}',
+                value: '${courseController.courses.length}',
                 label: 'Courses',
               ),
               _MetricCard(
@@ -131,16 +154,16 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                 label: 'Students',
               ),
               _MetricCard(
-                icon: Icons.trending_up,
-                value: '${_avgProgress.toStringAsFixed(1)}%',
-                label: 'Avg Progress',
+                icon: Icons.star_outline,
+                value: _avgRating > 0 ? _avgRating.toStringAsFixed(1) : '-',
+                label: 'Avg Rating',
               ),
             ],
           ),
           const SizedBox(height: 16),
           const Divider(color: AppTheme.dark400),
           const SizedBox(height: 16),
-          _PendingTasksCard(pendingCount: _pendingGrading),
+          _PendingTasksCard(pendingCount: _draftCourses),
         ],
       ),
     );
@@ -176,7 +199,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
         ),
         const SizedBox(height: 16),
         Obx(() {
-          if (courseController.instructorCourses.isEmpty) {
+          if (courseController.courses.isEmpty) {
             return Container(
               decoration: AppTheme.darkCard(),
               padding: const EdgeInsets.all(24),
@@ -200,8 +223,8 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
           }
 
           return Column(
-            children: courseController.instructorCourses.map((course) {
-              final enrollmentCount = course['enrollmentCount'] ?? 0;
+            children: courseController.courses.map((course) {
+              final enrollmentCount = course.enrollmentCount;
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: AppTheme.darkCard(radius: 12),
@@ -214,7 +237,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            course['title'] ?? 'Course',
+                            course.title,
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -234,7 +257,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            course['is_published'] ? 'Published' : 'Draft',
+                            course.isPublished ? 'Published' : 'Draft',
                             style: const TextStyle(
                               fontSize: 11,
                               color: AppTheme.primary500,
@@ -260,7 +283,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                         ElevatedButton(
                           onPressed: () {
                             Get.toNamed(
-                              '${AppRoutes.courseDetail}/${course['id']}',
+                              '${AppRoutes.courseDetail}/${course.id}',
                             );
                           },
                           style: ElevatedButton.styleFrom(
@@ -292,7 +315,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Recent Submissions',
+          'Course Pipeline',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -306,20 +329,20 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
           child: Column(
             children: [
               _SubmissionStatusRow(
-                label: 'Pending Grading',
-                count: _pendingGrading,
+                label: 'Published Courses',
+                count: _publishedCourses,
                 color: Colors.orange,
               ),
               const Divider(color: AppTheme.dark400),
               _SubmissionStatusRow(
-                label: 'Submitted',
-                count: 12,
+                label: 'Draft Courses',
+                count: _draftCourses,
                 color: AppTheme.success500,
               ),
               const Divider(color: AppTheme.dark400),
               _SubmissionStatusRow(
-                label: 'Graded',
-                count: 28,
+                label: 'Total Lessons',
+                count: _totalLessons,
                 color: AppTheme.primary500,
               ),
             ],
@@ -334,7 +357,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Top Performing Students',
+          'Top Courses by Enrollment',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
@@ -345,15 +368,33 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
         Container(
           decoration: AppTheme.darkCard(),
           padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _StudentProgressRow(rank: 1, name: 'John Doe', progress: 95),
-              const Divider(color: AppTheme.dark400),
-              _StudentProgressRow(rank: 2, name: 'Jane Smith', progress: 92),
-              const Divider(color: AppTheme.dark400),
-              _StudentProgressRow(rank: 3, name: 'Mike Johnson', progress: 88),
-            ],
-          ),
+          child: Obx(() {
+            if (courseController.courses.isEmpty) {
+              return const Text(
+                'Create your first course to see performance data.',
+                style: TextStyle(color: AppTheme.textMuted),
+              );
+            }
+
+            final topCourses = [...courseController.courses]
+              ..sort((a, b) => b.enrollmentCount.compareTo(a.enrollmentCount));
+
+            final visible = topCourses.take(3).toList();
+            return Column(
+              children: [
+                for (int i = 0; i < visible.length; i++) ...[
+                  _StudentProgressRow(
+                    rank: i + 1,
+                    name: visible[i].title,
+                    progress: visible[i].enrollmentCount,
+                    suffix: 'students',
+                  ),
+                  if (i != visible.length - 1)
+                    const Divider(color: AppTheme.dark400),
+                ],
+              ],
+            );
+          }),
         ),
       ],
     );
@@ -419,12 +460,12 @@ class _PendingTasksCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Pending Tasks',
+                'Publishing Queue',
                 style: TextStyle(fontSize: 13, color: AppTheme.textMuted),
               ),
               const SizedBox(height: 2),
               Text(
-                '$pendingCount assignments waiting for grading',
+                '$pendingCount draft courses waiting for publish review',
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
@@ -494,11 +535,13 @@ class _StudentProgressRow extends StatelessWidget {
   final int rank;
   final String name;
   final int progress;
+  final String suffix;
 
   const _StudentProgressRow({
     required this.rank,
     required this.name,
     required this.progress,
+    this.suffix = '%',
   });
 
   @override
@@ -537,7 +580,7 @@ class _StudentProgressRow extends StatelessWidget {
             ),
           ),
           Text(
-            '$progress%',
+            '$progress $suffix',
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,

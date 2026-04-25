@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/app_theme.dart';
-import 'app_widgets.dart';
+import '../common/app_widgets.dart';
 
 // ============================================
 // FORM FIELD MODELS
@@ -49,14 +49,11 @@ class AppDynamicForm extends StatefulWidget {
   });
 
   @override
-  State<AppDynamicForm> createState() =>
-      _AppDynamicFormState();
+  State<AppDynamicForm> createState() => _AppDynamicFormState();
 }
 
-class _AppDynamicFormState
-    extends State<AppDynamicForm> {
-  late Map<String, TextEditingController>
-      _controllers;
+class _AppDynamicFormState extends State<AppDynamicForm> {
+  late Map<String, TextEditingController> _controllers;
   late GlobalKey<FormState> _formKey;
 
   @override
@@ -65,32 +62,24 @@ class _AppDynamicFormState
     _formKey = GlobalKey<FormState>();
     _controllers = {};
     for (final field in widget.fields) {
-      _controllers[field.name] =
-          TextEditingController();
+      _controllers[field.name] = TextEditingController();
     }
   }
 
   @override
   void dispose() {
-    for (final controller
-        in _controllers.values) {
+    for (final controller in _controllers.values) {
       controller.dispose();
     }
     super.dispose();
   }
 
   void _submitForm() {
-    if (_formKey.currentState
-        ?.validate() ??
-        false) {
-      final values =
-          <String, String>{};
-      _controllers.forEach(
-        (key, controller) {
-          values[key] =
-              controller.text;
-        },
-      );
+    if (_formKey.currentState?.validate() ?? false) {
+      final values = <String, String>{};
+      _controllers.forEach((key, controller) {
+        values[key] = controller.text;
+      });
       widget.onSubmit();
     }
   }
@@ -100,100 +89,55 @@ class _AppDynamicFormState
     return Form(
       key: _formKey,
       onChanged: () {
-        final values =
-            <String, String>{};
-        _controllers.forEach(
-          (key, controller) {
-            values[key] =
-                controller.text;
-          },
-        );
+        final values = <String, String>{};
+        _controllers.forEach((key, controller) {
+          values[key] = controller.text;
+        });
         widget.onChanges(values);
       },
       child: Column(
         children: [
-          ...widget.fields
-              .map(
-                (field) => Padding(
-              padding:
-                  const EdgeInsets
-                      .only(
-                bottom: 16,
-              ),
+          ...widget.fields.map(
+            (field) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Text(
-                        field
-                            .label,
-                        style:
-                            const TextStyle(
-                          fontSize:
-                              14,
-                          fontWeight:
-                              FontWeight
-                                  .w600,
-                          color: Colors
-                              .white,
+                        field.label,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
-                      if (field
-                          .isRequired)
-                        const Text(
-                          ' *',
-                          style:
-                              TextStyle(
-                            color: Colors
-                                .red,
-                          ),
-                        ),
+                      if (field.isRequired)
+                        const Text(' *', style: TextStyle(color: Colors.red)),
                     ],
                   ),
-                  const SizedBox(
-                    height: 8,
-                  ),
+                  const SizedBox(height: 8),
                   AppTextField(
-                    hintText: field
-                        .hintText,
-                    controller:
-                        _controllers[
-                      field.name,
-                    ]!,
-                    keyboardType:
-                        field
-                            .keyboardType,
-                    obscureText: field
-                        .obscureText,
-                    prefixIcon: field
-                        .prefixIcon !=
-                        null
-                        ? Icon(
-                      field
-                          .prefixIcon,
-                    )
+                    hintText: field.hintText,
+                    controller: _controllers[field.name]!,
+                    keyboardType: field.keyboardType,
+                    obscureText: field.obscureText,
+                    prefixIcon: field.prefixIcon != null
+                        ? Icon(field.prefixIcon)
                         : null,
-                    validator:
-                        field.validator,
+                    validator: field.validator,
                   ),
                 ],
               ),
             ),
-          )
-              .toList(),
+          ),
           const SizedBox(height: 24),
           AppButton(
-            label: widget
-                .submitLabel,
-            onPressed:
-                _submitForm,
-            isLoading: widget
-                .isLoading,
-            isEnabled:
-                !widget.isLoading,
+            label: widget.submitLabel,
+            onPressed: _submitForm,
+            isLoading: widget.isLoading,
+            isEnabled: !widget.isLoading,
           ),
         ],
       ),
@@ -205,8 +149,7 @@ class _AppDynamicFormState
 // MULTI-STEP FORM WIDGET
 // ============================================
 
-class AppMultiStepForm
-    extends StatefulWidget {
+class AppMultiStepForm extends StatefulWidget {
   final List<String> steps;
   final List<Widget> contents;
   final VoidCallback onCompleted;
@@ -221,17 +164,14 @@ class AppMultiStepForm
   });
 
   @override
-  State<AppMultiStepForm> createState() =>
-      _AppMultiStepFormState();
+  State<AppMultiStepForm> createState() => _AppMultiStepFormState();
 }
 
-class _AppMultiStepFormState
-    extends State<AppMultiStepForm> {
+class _AppMultiStepFormState extends State<AppMultiStepForm> {
   int _currentStep = 0;
 
   void _nextStep() {
-    if (_currentStep <
-        widget.steps.length - 1) {
+    if (_currentStep < widget.steps.length - 1) {
       setState(() {
         _currentStep++;
       });
@@ -254,84 +194,55 @@ class _AppMultiStepFormState
       children: [
         // Step Indicator
         Padding(
-          padding: const EdgeInsets
-              .only(bottom: 32),
+          padding: const EdgeInsets.only(bottom: 32),
           child: Row(
             children: [
-              ...widget.steps
-                  .asMap()
-                  .entries
-                  .map(
-                    (entry) => Expanded(
+              ...widget.steps.asMap().entries.map(
+                (entry) => Expanded(
                   child: Column(
                     children: [
                       Container(
                         width: 48,
                         height: 48,
-                        decoration:
-                            BoxDecoration(
-                          shape: BoxShape
-                              .circle,
-                          color: entry
-                                  .key <=
-                              _currentStep
-                              ? AppTheme
-                                  .primary500
-                              : AppTheme
-                                  .dark400,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: entry.key <= _currentStep
+                              ? AppTheme.primary500
+                              : AppTheme.dark400,
                         ),
                         child: Center(
                           child: Text(
                             '${entry.key + 1}',
-                            style:
-                                const TextStyle(
-                              fontSize:
-                                  16,
-                              fontWeight:
-                                  FontWeight
-                                      .w700,
-                              color: Colors
-                                  .white,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(
-                        height: 8,
-                      ),
+                      const SizedBox(height: 8),
                       Text(
                         entry.value,
-                        style:
-                            TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: entry
-                                  .key <=
-                              _currentStep
-                              ? Colors
-                                  .white
-                              : Colors
-                                  .grey[600],
+                          color: entry.key <= _currentStep
+                              ? Colors.white
+                              : Colors.grey[600],
                         ),
-                        textAlign:
-                            TextAlign
-                                .center,
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 ),
-                  )
-                  .toList(),
+              ),
             ],
           ),
         ),
 
         // Content
         Expanded(
-          child: SingleChildScrollView(
-            child: widget.contents[
-              _currentStep,
-            ],
-          ),
+          child: SingleChildScrollView(child: widget.contents[_currentStep]),
         ),
 
         // Navigation Buttons
@@ -342,25 +253,17 @@ class _AppMultiStepFormState
               Expanded(
                 child: AppOutlineButton(
                   label: 'Previous',
-                  onPressed:
-                      _previousStep,
+                  onPressed: _previousStep,
                 ),
               ),
-            if (_currentStep > 0)
-              const SizedBox(
-                width: 12,
-              ),
+            if (_currentStep > 0) const SizedBox(width: 12),
             Expanded(
               child: AppButton(
-                label: _currentStep ==
-                    widget.steps
-                        .length -
-                    1
+                label: _currentStep == widget.steps.length - 1
                     ? 'Complete'
                     : 'Next',
                 onPressed: _nextStep,
-                isLoading:
-                    widget.isLoading,
+                isLoading: widget.isLoading,
               ),
             ),
           ],
@@ -375,104 +278,77 @@ class _AppMultiStepFormState
 // ============================================
 
 class FormValidators {
-  static String? validateEmail(
-    String? value,
-  ) {
+  static String? validateEmail(String? value) {
     if (value?.isEmpty ?? true) {
       return 'Email is required';
     }
-    const emailPattern =
-        r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$';
-    if (!RegExp(emailPattern)
-        .hasMatch(value ?? '')) {
+    const emailPattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$';
+    if (!RegExp(emailPattern).hasMatch(value ?? '')) {
       return 'Invalid email format';
     }
     return null;
   }
 
-  static String? validatePassword(
-    String? value,
-  ) {
+  static String? validatePassword(String? value) {
     if (value?.isEmpty ?? true) {
       return 'Password is required';
     }
     if ((value ?? '').length < 8) {
       return 'Password must be at least 8 characters';
     }
-    if (!RegExp(r'[A-Z]')
-        .hasMatch(value ?? '')) {
+    if (!RegExp(r'[A-Z]').hasMatch(value ?? '')) {
       return 'Password must contain uppercase letter';
     }
-    if (!RegExp(r'[a-z]')
-        .hasMatch(value ?? '')) {
+    if (!RegExp(r'[a-z]').hasMatch(value ?? '')) {
       return 'Password must contain lowercase letter';
     }
-    if (!RegExp(r'[0-9]')
-        .hasMatch(value ?? '')) {
+    if (!RegExp(r'[0-9]').hasMatch(value ?? '')) {
       return 'Password must contain number';
     }
     return null;
   }
 
-  static String? validatePhoneNumber(
-    String? value,
-  ) {
+  static String? validatePhoneNumber(String? value) {
     if (value?.isEmpty ?? true) {
       return 'Phone number is required';
     }
-    const phonePattern =
-        r'^\+?[\d\s\-()]{10,}$';
-    if (!RegExp(phonePattern)
-        .hasMatch(value ?? '')) {
+    const phonePattern = r'^\+?[\d\s\-()]{10,}$';
+    if (!RegExp(phonePattern).hasMatch(value ?? '')) {
       return 'Invalid phone number';
     }
     return null;
   }
 
-  static String? validateRequired(
-    String? value,
-  ) {
+  static String? validateRequired(String? value) {
     if (value?.isEmpty ?? true) {
       return 'This field is required';
     }
     return null;
   }
 
-  static String? validateMinLength(
-    String? value,
-    int minLength,
-  ) {
+  static String? validateMinLength(String? value, int minLength) {
     if (value?.isEmpty ?? true) {
       return 'This field is required';
     }
-    if ((value ?? '').length <
-        minLength) {
+    if ((value ?? '').length < minLength) {
       return 'Must be at least $minLength characters';
     }
     return null;
   }
 
-  static String? validateMaxLength(
-    String? value,
-    int maxLength,
-  ) {
-    if ((value ?? '').length >
-        maxLength) {
+  static String? validateMaxLength(String? value, int maxLength) {
+    if ((value ?? '').length > maxLength) {
       return 'Must be at most $maxLength characters';
     }
     return null;
   }
 
-  static String? validateUrl(
-    String? value,
-  ) {
+  static String? validateUrl(String? value) {
     if (value?.isEmpty ?? true) {
       return 'URL is required';
     }
-    const urlPattern =
-        r'^https?://[^\s/$.?#].[^\s]*$';
-    if (!RegExp(urlPattern)
-        .hasMatch(value ?? '')) {
+    const urlPattern = r'^https?://[^\s/$.?#].[^\s]*$';
+    if (!RegExp(urlPattern).hasMatch(value ?? '')) {
       return 'Invalid URL format';
     }
     return null;
@@ -498,12 +374,10 @@ class AppCheckbox extends StatefulWidget {
   });
 
   @override
-  State<AppCheckbox> createState() =>
-      _AppCheckboxState();
+  State<AppCheckbox> createState() => _AppCheckboxState();
 }
 
-class _AppCheckboxState
-    extends State<AppCheckbox> {
+class _AppCheckboxState extends State<AppCheckbox> {
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -511,30 +385,19 @@ class _AppCheckboxState
         Checkbox(
           value: widget.value,
           onChanged: (newValue) {
-            widget.onChanged(
-              newValue ?? false,
-            );
+            widget.onChanged(newValue ?? false);
           },
-          activeColor:
-              widget.activeColor ??
-                  AppTheme.primary500,
-          side: const BorderSide(
-            color: AppTheme.dark400,
-          ),
+          activeColor: widget.activeColor ?? AppTheme.primary500,
+          side: const BorderSide(color: AppTheme.dark400),
         ),
         Expanded(
           child: GestureDetector(
             onTap: () {
-              widget
-                  .onChanged(!widget.value);
+              widget.onChanged(!widget.value);
             },
             child: Text(
               widget.label,
-              style:
-                  const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
             ),
           ),
         ),
@@ -543,8 +406,7 @@ class _AppCheckboxState
   }
 }
 
-class AppRadioButton<T>
-    extends StatelessWidget {
+class AppRadioButton<T> extends StatelessWidget {
   final String label;
   final T value;
   final T groupValue;
@@ -566,19 +428,14 @@ class AppRadioButton<T>
           value: value,
           groupValue: groupValue,
           onChanged: onChanged,
-          activeColor:
-              AppTheme.primary500,
+          activeColor: AppTheme.primary500,
         ),
         Expanded(
           child: GestureDetector(
             onTap: () => onChanged(value),
             child: Text(
               label,
-              style:
-                  const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
             ),
           ),
         ),
@@ -608,34 +465,24 @@ class AppSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisAlignment:
-          MainAxisAlignment
-              .spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               label,
               style: const TextStyle(
                 fontSize: 14,
-                fontWeight:
-                    FontWeight.w600,
+                fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
             ),
-            if (description !=
-                null) ...[
+            if (description != null) ...[
               const SizedBox(height: 4),
               Text(
                 description!,
-                style:
-                    const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme
-                      .textMuted,
-                ),
+                style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
               ),
             ],
           ],
@@ -643,8 +490,7 @@ class AppSwitch extends StatelessWidget {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor:
-              AppTheme.primary500,
+          activeThumbColor: AppTheme.primary500,
         ),
       ],
     );

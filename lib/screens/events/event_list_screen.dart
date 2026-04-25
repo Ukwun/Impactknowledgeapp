@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../config/app_theme.dart';
+import '../../providers/auth_controller.dart';
 import '../../providers/event_controller.dart';
 
 class EventListScreen extends StatefulWidget {
@@ -12,6 +13,7 @@ class EventListScreen extends StatefulWidget {
 
 class _EventListScreenState extends State<EventListScreen> {
   late EventController _eventController;
+  late AuthController _authController;
   String _filterType = 'all';
   late TextEditingController _searchController;
 
@@ -19,8 +21,100 @@ class _EventListScreenState extends State<EventListScreen> {
   void initState() {
     super.initState();
     _eventController = Get.put(EventController());
+    _authController = Get.find<AuthController>();
     _searchController = TextEditingController();
     _eventController.loadEvents();
+  }
+
+  bool get _canManageEvents {
+    final role = _authController.currentUser.value?.role?.name;
+    return role == 'admin' || role == 'instructor' || role == 'facilitator';
+  }
+
+  Future<void> _showCreateOrEditEventDialog({
+    Map<String, dynamic>? existing,
+  }) async {
+    final titleController = TextEditingController(
+      text: existing?['title']?.toString() ?? '',
+    );
+    final descriptionController = TextEditingController(
+      text: existing?['description']?.toString() ?? '',
+    );
+    final typeController = TextEditingController(
+      text: existing?['type']?.toString() ?? 'workshop',
+    );
+    final locationController = TextEditingController(
+      text: existing?['location']?.toString() ?? '',
+    );
+    final dateController = TextEditingController(
+      text: (existing?['date']?.toString() ?? '').replaceFirst('Z', ''),
+    );
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(existing == null ? 'Create Event' : 'Edit Event'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: titleController,
+                decoration: const InputDecoration(labelText: 'Title'),
+              ),
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(labelText: 'Description'),
+              ),
+              TextField(
+                controller: typeController,
+                decoration: const InputDecoration(
+                  labelText: 'Type (workshop/webinar/meetup)',
+                ),
+              ),
+              TextField(
+                controller: locationController,
+                decoration: const InputDecoration(labelText: 'Location'),
+              ),
+              TextField(
+                controller: dateController,
+                decoration: const InputDecoration(
+                  labelText: 'Start Date (ISO)',
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () async {
+              final payload = {
+                'title': titleController.text.trim(),
+                'description': descriptionController.text.trim(),
+                'eventType': typeController.text.trim(),
+                'location': locationController.text.trim(),
+                'startDate': dateController.text.trim(),
+              };
+              bool success;
+              if (existing == null) {
+                success = await _eventController.createEvent(payload);
+              } else {
+                success = await _eventController.updateEvent(
+                  existing['id'].toString(),
+                  payload,
+                );
+              }
+
+              if (success && mounted) {
+                Get.back();
+              }
+            },
+            child: Text(existing == null ? 'Create' : 'Save'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -71,6 +165,13 @@ class _EventListScreenState extends State<EventListScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
+      floatingActionButton: _canManageEvents
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateOrEditEventDialog(),
+              icon: const Icon(Icons.add),
+              label: const Text('Create Event'),
+            )
+          : null,
       body: Column(
         children: [
           // Search bar
@@ -161,6 +262,10 @@ class _EventListScreenState extends State<EventListScreen> {
                   final event = filtered[index];
                   return _EventCard(
                     event: event,
+                    canManage: _canManageEvents,
+                    onEdit: () => _showCreateOrEditEventDialog(existing: event),
+                    onDelete: () =>
+                        _eventController.deleteEvent(event['id'].toString()),
                     onTap: () {
                       Get.toNamed('/event-detail', arguments: event['id']);
                     },
@@ -178,8 +283,17 @@ class _EventListScreenState extends State<EventListScreen> {
 class _EventCard extends StatelessWidget {
   final Map<String, dynamic> event;
   final VoidCallback onTap;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _EventCard({required this.event, required this.onTap});
+  const _EventCard({
+    required this.event,
+    required this.onTap,
+    required this.canManage,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   String formatDate(String dateStr) {
     try {
@@ -325,6 +439,26 @@ class _EventCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                          if (canManage)
+                            PopupMenuButton<String>(
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  onEdit();
+                                } else if (value == 'delete') {
+                                  onDelete();
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('Edit Event'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Delete Event'),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                       const SizedBox(height: 4),

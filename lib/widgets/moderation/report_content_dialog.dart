@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../config/app_theme.dart';
 import '../../config/service_locator.dart';
-import '../moderation/moderation_service.dart';
+import '../../services/moderation/moderation_service.dart';
 
 class ReportContentDialog extends StatefulWidget {
   final String contentType; // 'course', 'lesson', 'comment', 'user'
@@ -94,7 +94,7 @@ class _ReportContentDialogState extends State<ReportContentDialog> {
               // Header
               Row(
                 children: [
-                  const Icon(Icons.flag, color: AppTheme.error500),
+                  const Icon(Icons.flag, color: AppTheme.danger500),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
@@ -222,7 +222,7 @@ class _ReportContentDialogState extends State<ReportContentDialog> {
                   ElevatedButton(
                     onPressed: isSubmitting ? null : _submitReport,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.error500,
+                      backgroundColor: AppTheme.danger500,
                       disabledBackgroundColor: Colors.grey,
                     ),
                     child: isSubmitting

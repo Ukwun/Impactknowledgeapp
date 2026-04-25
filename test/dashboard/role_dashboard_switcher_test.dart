@@ -55,6 +55,70 @@ class _FakeApiService extends ApiService {
   }
 }
 
+class _FakeDashboardService extends DashboardService {
+  _FakeDashboardService()
+    : super(
+        apiService: _FakeApiService(),
+        cacheService: DashboardCacheService(),
+      );
+
+  static const Map<String, dynamic> _payload = {
+    'summary': {
+      'childrenLinked': 2,
+      'avgProgress': 78,
+      'attendanceRate': 92,
+      'unreadMessages': 5,
+      'activeClasses': 6,
+      'pendingReviews': 18,
+      'atRiskLearners': 4,
+      'totalStudents': 1250,
+      'totalFacilitators': 45,
+      'completionRate': 72,
+      'openAlerts': 3,
+      'totalMentees': 14,
+      'upcomingSessions': 7,
+      'completedSessions': 52,
+      'avgMenteeGrowth': 81,
+      'connections': 238,
+      'postsThisMonth': 12,
+      'roundtables': 4,
+      'profileReach': 1420,
+      'ventureStage': 'Development',
+      'teamMembers': 4,
+      'mentorSessions': 9,
+      'openOpportunities': 6,
+      'totalUsers': 12480,
+      'activeCourses': 173,
+    },
+  };
+
+  Future<Map<String, dynamic>> _fake() async => _payload;
+
+  @override
+  Future<Map<String, dynamic>> fetchParentDashboard() => _fake();
+
+  @override
+  Future<Map<String, dynamic>> fetchFacilitatorDashboard() => _fake();
+
+  @override
+  Future<Map<String, dynamic>> fetchSchoolAdminDashboard() => _fake();
+
+  @override
+  Future<Map<String, dynamic>> fetchMentorDashboard() => _fake();
+
+  @override
+  Future<Map<String, dynamic>> fetchCircleMemberDashboard() => _fake();
+
+  @override
+  Future<Map<String, dynamic>> fetchUniMemberDashboard() => _fake();
+
+  @override
+  Future<Map<String, dynamic>> fetchAdminDashboard() => _fake();
+
+  @override
+  Future<Map<String, dynamic>> fetchLearnerDashboard() => _fake();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -66,12 +130,7 @@ void main() {
     if (getIt.isRegistered<DashboardService>()) {
       getIt.unregister<DashboardService>();
     }
-    getIt.registerSingleton<DashboardService>(
-      DashboardService(
-        apiService: _FakeApiService(),
-        cacheService: DashboardCacheService(),
-      ),
-    );
+    getIt.registerSingleton<DashboardService>(_FakeDashboardService());
   });
 
   tearDown(() {
@@ -130,7 +189,9 @@ void main() {
           ),
         ),
       );
-      await tester.pumpAndSettle();
+      // LiveRoleDashboardData starts a periodic timer, so avoid pumpAndSettle.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
     }
 
     testWidgets('lands parent user on Parent Dashboard', (tester) async {

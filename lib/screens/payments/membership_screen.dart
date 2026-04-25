@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../providers/payment_controller.dart';
-import '../../providers/auth_controller.dart';
 import '../../widgets/common/custom_widgets.dart';
 
 class MembershipScreen extends StatefulWidget {
@@ -310,7 +309,6 @@ class _MembershipScreenState extends State<MembershipScreen> {
     double price,
     PaymentController controller,
   ) {
-    final authController = Get.find<AuthController>();
     showDialog(
       context: context,
       builder: (context) {

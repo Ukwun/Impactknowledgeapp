@@ -68,8 +68,7 @@ class PaymentController extends GetxController {
       );
 
       if (response != null) {
-        // Open Flutterwave link
-        // You can use url_launcher package here
+        // The checkout URL is opened by the payment screen flow.
         return true;
       }
       return false;
@@ -92,7 +91,6 @@ class PaymentController extends GetxController {
       );
 
       if (response != null) {
-        // Open Flutterwave link
         return true;
       }
       return false;

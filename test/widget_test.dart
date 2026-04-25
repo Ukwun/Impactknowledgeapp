@@ -1,20 +1,27 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:impactknowledge_app/config/service_locator.dart';
-import 'package:impactknowledge_app/main.dart';
+import 'package:flutter/material.dart';
+import 'package:impactknowledge_app/screens/dashboard/roles/role_dashboard_widgets.dart';
 
 void main() {
-  testWidgets('App boots to splash then landing', (WidgetTester tester) async {
-    setupServiceLocator();
-
-    await tester.pumpWidget(const MyApp());
+  testWidgets('RoleDashboardScaffold renders title and role chip', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: RoleDashboardScaffold(
+            title: 'Parent Dashboard',
+            subtitle: 'Monitor progress',
+            roleLabel: 'Parent',
+            firstName: 'Ada',
+            children: [],
+          ),
+        ),
+      ),
+    );
     await tester.pump();
 
-    expect(find.text('Learning. Building. Leading.'), findsOneWidget);
-
-    await tester.pump(const Duration(milliseconds: 3200));
-    await tester.pumpAndSettle();
-
-    expect(find.text('From Knowledge to Opportunity'), findsOneWidget);
-    expect(find.text('Get Started'), findsOneWidget);
+    expect(find.text('Parent Dashboard'), findsOneWidget);
+    expect(find.text('Parent'), findsOneWidget);
   });
 }

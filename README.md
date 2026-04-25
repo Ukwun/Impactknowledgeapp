@@ -31,7 +31,7 @@ A complete Flutter mobile application for the ImpactKnowledge online learning pl
   - User rankings and statistics
 
 - **Payments & Membership**
-  - Flutterwave payment integration
+  - Stripe-hosted checkout for online payments
   - Multiple pricing tiers (Free, Starter, Pro, Premium)
   - Monthly and annual billing options
   - Course purchase functionality
@@ -107,7 +107,7 @@ impactknowledge_app/
 - **HTTP Client**: `dio` (REST API communication)
 - **Storage**: `hive`, `shared_preferences`, `flutter_secure_storage`
 - **Authentication**: `jwt_decoder`, Firebase Auth (optional)
-- **Payments**: `flutterwave_payment`
+- **Payments**: Hosted checkout via backend Stripe integration
 - **Navigation**: `go_router`
 
 ## 🚀 Getting Started

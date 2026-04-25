@@ -56,8 +56,8 @@ class AssignmentController extends GetxController {
 
       final response = await apiService.getAssignmentDetail(assignmentId);
       currentAssignment.value = response is Map
-          ? Map<String, dynamic>.from(response as Map)
-          : Map<String, dynamic>.from(response as Map);
+          ? Map<String, dynamic>.from(response)
+          : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load assignment: ${e.toString()}';
       print('Error loading assignment: $e');
@@ -112,7 +112,7 @@ class AssignmentController extends GetxController {
       final response = await apiService.getSubmission(submissionId);
       currentSubmission.value = response is Map
           ? response
-          : Map<String, dynamic>.from(response as Map);
+          : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load submission: ${e.toString()}';
       print('Error loading submission: $e');
@@ -169,14 +169,101 @@ class AssignmentController extends GetxController {
       isLoading.value = true;
       error.value = '';
 
-      // In a real app, this would download the file
-      // For now, just fetch the submission details
-      await getSubmission(submissionId);
-      return true;
+      final response = await apiService.getSubmissionFile(submissionId);
+      if (response != null && response['success'] == true) {
+        final data = response['data'];
+        if (data is Map && data['fileUrl'] != null) {
+          currentSubmission.value ??= <String, dynamic>{};
+          currentSubmission.value!['fileUrl'] = data['fileUrl'];
+          return true;
+        }
+      }
+      return false;
     } catch (e) {
       error.value = 'Failed to download submission: ${e.toString()}';
       print('Error downloading: $e');
       return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Resolve and cache the latest secure file URL for a submission
+  Future<String?> resolveSubmissionFileUrl(String submissionId) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final response = await apiService.getSubmissionFile(submissionId);
+      if (response != null && response['success'] == true) {
+        final data = response['data'];
+        if (data is Map && data['fileUrl'] != null) {
+          final url = data['fileUrl'].toString();
+          currentSubmission.value ??= <String, dynamic>{};
+          currentSubmission.value!['fileUrl'] = url;
+          currentSubmission.value!['file_url'] = url;
+          return url;
+        }
+      }
+      return null;
+    } catch (e) {
+      error.value = 'Failed to resolve submission file: ${e.toString()}';
+      print('Error resolving file URL: $e');
+      return null;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Delete submission file
+  Future<bool> deleteSubmissionFile(String submissionId) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final response = await apiService.deleteSubmissionFile(submissionId);
+      if (response != null && response['success'] == true) {
+        if (currentSubmission.value != null) {
+          currentSubmission.value!.remove('fileUrl');
+          currentSubmission.value!.remove('file_url');
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      error.value = 'Failed to delete submission file: ${e.toString()}';
+      print('Error deleting file: $e');
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  /// Load all pending/due assignments for the current user across every enrolled course.
+  Future<void> loadMyAssignments() async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final response = await apiService.getMyAssignments();
+      if (response is List) {
+        assignments.value = response
+            .map<Map<String, dynamic>>(
+              (a) => Map<String, dynamic>.from(a as Map),
+            )
+            .toList();
+      } else if (response is Map && response['success'] == true) {
+        final data = response['data'];
+        if (data is List) {
+          assignments.value = data
+              .map<Map<String, dynamic>>(
+                (a) => Map<String, dynamic>.from(a as Map),
+              )
+              .toList();
+        }
+      }
+    } catch (e) {
+      error.value = 'Failed to load your assignments: ${e.toString()}';
     } finally {
       isLoading.value = false;
     }

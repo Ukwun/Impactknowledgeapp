@@ -3,7 +3,7 @@ import 'package:get_it/get_it.dart';
 import '../../services/support/support_service.dart';
 
 class SupportTicketListScreen extends StatefulWidget {
-  const SupportTicketListScreen({Key? key}) : super(key: key);
+  const SupportTicketListScreen({super.key});
 
   @override
   State<SupportTicketListScreen> createState() =>
@@ -24,21 +24,6 @@ class _SupportTicketListScreenState extends State<SupportTicketListScreen> {
     setState(() {
       ticketsFuture = supportService.getMyTickets();
     });
-  }
-
-  Color _getStatusColor(String status) {
-    switch (status) {
-      case 'open':
-        return Colors.orange;
-      case 'in-progress':
-        return Colors.blue;
-      case 'resolved':
-        return Colors.green;
-      case 'closed':
-        return Colors.grey;
-      default:
-        return Colors.grey;
-    }
   }
 
   @override
@@ -248,7 +233,7 @@ class _TicketCard extends StatelessWidget {
 }
 
 class CreateSupportTicketDialog extends StatefulWidget {
-  const CreateSupportTicketDialog({Key? key}) : super(key: key);
+  const CreateSupportTicketDialog({super.key});
 
   @override
   State<CreateSupportTicketDialog> createState() =>
@@ -310,7 +295,7 @@ class _CreateSupportTicketDialogState extends State<CreateSupportTicketDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: selectedCategory,
+              initialValue: selectedCategory,
               onChanged: (value) {
                 setState(() => selectedCategory = value ?? 'technical');
               },
@@ -373,8 +358,7 @@ class _CreateSupportTicketDialogState extends State<CreateSupportTicketDialog> {
 class SupportTicketDetailScreen extends StatefulWidget {
   final int ticketId;
 
-  const SupportTicketDetailScreen({Key? key, required this.ticketId})
-    : super(key: key);
+  const SupportTicketDetailScreen({super.key, required this.ticketId});
 
   @override
   State<SupportTicketDetailScreen> createState() =>

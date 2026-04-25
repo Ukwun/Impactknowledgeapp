@@ -6,12 +6,114 @@
 const express = require('express');
 const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
-const PaystackService = require('../services/paystack_service');
+const StripeService = require('../services/stripe_service');
 const NotificationTriggerService = require('../services/notification-trigger-service');
 const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
-const paystack = new PaystackService();
+const stripe = new StripeService();
+const DEFAULT_PAYMENT_CURRENCY = (process.env.DEFAULT_PAYMENT_CURRENCY || 'usd').toLowerCase();
+
+function paymentMetadata(payment) {
+  return payment && payment.metadata && typeof payment.metadata === 'object'
+    ? payment.metadata
+    : {};
+}
+
+async function grantPaymentAccess(payment) {
+  if (payment.item_type === 'course') {
+    await query(
+      `INSERT INTO enrollments (user_id, course_id, enrollment_date)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id, course_id) DO NOTHING`,
+      [payment.user_id, payment.item_id]
+    );
+    return;
+  }
+
+  if (payment.item_type === 'membership') {
+    await query(
+      `UPDATE users
+       SET membership_tier_id = $1, membership_expires_at = NOW() + INTERVAL '30 days'
+       WHERE id = $2`,
+      [payment.item_id, payment.user_id]
+    );
+  }
+}
+
+async function finalizePayment(payment, completion = {}) {
+  if (payment.status === 'completed') {
+    return payment;
+  }
+
+  const metadata = {
+    ...paymentMetadata(payment),
+    provider: 'stripe',
+    providerSessionId:
+      completion.sessionId || paymentMetadata(payment).providerSessionId || null,
+    paymentIntentId:
+      completion.paymentIntentId || paymentMetadata(payment).paymentIntentId || null,
+    receiptUrl:
+      completion.receiptUrl || paymentMetadata(payment).receiptUrl || null,
+    completedAt: completion.paidAt || new Date().toISOString(),
+  };
+
+  await query(
+    `UPDATE payments
+     SET status = 'completed',
+         payment_method = 'card',
+         currency = COALESCE(currency, $1),
+         updated_at = NOW(),
+         metadata = $2::jsonb
+     WHERE id = $3`,
+    [DEFAULT_PAYMENT_CURRENCY, JSON.stringify(metadata), payment.id]
+  );
+
+  await grantPaymentAccess(payment);
+
+  await query(
+    `INSERT INTO user_activities (user_id, activity_type, metadata)
+     VALUES ($1, 'PAYMENT_COMPLETED', $2::jsonb)`,
+    [
+      payment.user_id,
+      JSON.stringify({
+        reference: payment.reference,
+        itemType: payment.item_type,
+        itemId: payment.item_id,
+        amount: payment.amount,
+        currency: payment.currency || DEFAULT_PAYMENT_CURRENCY,
+        paymentIntentId: metadata.paymentIntentId,
+      }),
+    ]
+  );
+
+  await NotificationTriggerService.notifyUser({
+    userId: payment.user_id,
+    title: 'Payment Successful',
+    message:
+      payment.item_type === 'course'
+        ? 'Your payment was confirmed and course access is now active.'
+        : 'Your payment was confirmed and your membership is now active.',
+    type: 'payment',
+    actionUrl: payment.item_type === 'course' ? '/courses' : '/profile',
+    metadata: {
+      action: 'payment_completed',
+      resourceId: payment.id,
+      reference: payment.reference,
+      itemType: payment.item_type,
+      itemId: payment.item_id,
+      amount: payment.amount,
+      receiptUrl: metadata.receiptUrl,
+    },
+    push: true,
+  });
+
+  return {
+    ...payment,
+    status: 'completed',
+    metadata,
+  };
+}
 
 // ============================================
 // CARD PAYMENT ROUTES
@@ -47,44 +149,62 @@ router.post('/card/initialize', verifyToken, async (req, res) => {
     }
 
     const userEmail = userResult.rows[0].email;
+    const frontendBaseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'https://impactknowledge.app';
 
     // Create payment record
     const paymentReference = `PKG_${uuidv4().substring(0, 12).toUpperCase()}`;
     const paymentResult = await query(
       `INSERT INTO payments 
-       (user_id, item_type, item_id, amount, reference, status, payment_method, metadata, created_at)
-       VALUES ($1, $2, $3, $4, $5, 'pending', 'card', $6, NOW())
+       (user_id, item_type, item_id, amount, currency, reference, status, payment_method, metadata, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending', 'card', $7, NOW())
        RETURNING id, reference`,
       [
         userId,
         itemType,
         itemId,
         amount,
+        DEFAULT_PAYMENT_CURRENCY,
         paymentReference,
         JSON.stringify({
           description,
+          provider: 'stripe',
           initiatedAt: new Date().toISOString(),
         }),
       ]
     );
 
-    // Initialize Paystack card payment
-    const paystackResponse = await paystack.initializeCardPayment(
-      userEmail,
+    const stripeResponse = await stripe.createCheckoutSession({
+      email: userEmail,
       amount,
-      paymentReference,
-      {
+      currency: DEFAULT_PAYMENT_CURRENCY,
+      reference: paymentReference,
+      description: description || `${itemType} purchase`,
+      metadata: {
         itemType,
         itemId,
         userId,
-      }
+      },
+      successUrl: `${frontendBaseUrl}/payments/success?reference=${paymentReference}`,
+      cancelUrl: `${frontendBaseUrl}/payments/cancel?reference=${paymentReference}`,
+    });
+
+    await query(
+      `UPDATE payments
+       SET metadata = jsonb_set(
+         COALESCE(metadata, '{}'::jsonb),
+         '{providerSessionId}',
+         to_jsonb($1::text),
+         true
+       )
+       WHERE id = $2`,
+      [stripeResponse.sessionId, paymentResult.rows[0].id]
     );
 
     res.json({
       success: true,
       reference: paymentReference,
-      paymentUrl: paystackResponse.paymentUrl,
-      accessCode: paystackResponse.accessCode,
+      paymentUrl: stripeResponse.paymentUrl,
+      accessCode: stripeResponse.accessCode,
       amount,
     });
   } catch (err) {
@@ -135,86 +255,25 @@ router.post('/card/verify', verifyToken, async (req, res) => {
       });
     }
 
-    // Verify with Paystack
-    const verification = await paystack.verifyCardPayment(reference);
+    const metadata = paymentMetadata(payment);
+    if (!metadata.providerSessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Payment is missing a Stripe checkout session reference',
+      });
+    }
+
+    const verification = await stripe.verifyCheckoutSession(metadata.providerSessionId);
 
     if (!verification.success) {
       return res.json({
         success: false,
-        error: 'Payment verification failed',
-        status: 'failed',
+        error: 'Payment is not completed yet',
+        status: verification.status || 'pending',
       });
     }
 
-    // Payment successful - update DB
-    await query(
-      `UPDATE payments 
-       SET status = 'completed', updated_at = NOW(),
-           metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{verifiedAt}', to_jsonb($1::text), true)
-       WHERE id = $2`,
-      [new Date().toISOString(), payment.id]
-    );
-
-    // Grant access based on item type
-    if (payment.item_type === 'course') {
-      // Check if already enrolled
-      const enrollmentCheck = await query(
-        `SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2`,
-        [userId, payment.item_id]
-      );
-
-      if (enrollmentCheck.rows.length === 0) {
-        // Create enrollment
-        await query(
-          `INSERT INTO enrollments (user_id, course_id, enrollment_date)
-           VALUES ($1, $2, NOW())`,
-          [userId, payment.item_id]
-        );
-      }
-    } else if (payment.item_type === 'membership') {
-      // Update user membership
-      await query(
-        `UPDATE users 
-         SET membership_tier_id = $1, membership_expires_at = NOW() + INTERVAL '30 days'
-         WHERE id = $2`,
-        [payment.item_id, userId]
-      );
-    }
-
-    // Log transaction
-    await query(
-      `INSERT INTO user_activities (user_id, activity_type, metadata)
-       VALUES ($1, 'PAYMENT_COMPLETED', $2)`,
-      [
-        userId,
-        JSON.stringify({
-          reference,
-          itemType: payment.item_type,
-          itemId: payment.item_id,
-          amount: payment.amount,
-        }),
-      ]
-    );
-
-    await NotificationTriggerService.notifyUser({
-      userId,
-      title: 'Payment Successful',
-      message:
-        payment.item_type === 'course'
-          ? 'Your payment was confirmed and course access is now active.'
-          : 'Your payment was confirmed and your membership is now active.',
-      type: 'payment',
-      actionUrl: payment.item_type === 'course' ? '/courses' : '/profile',
-      metadata: {
-        action: 'payment_completed',
-        resourceId: payment.id,
-        reference,
-        itemType: payment.item_type,
-        itemId: payment.item_id,
-        amount: payment.amount,
-      },
-      push: true,
-    });
+    await finalizePayment(payment, verification);
 
     res.json({
       success: true,
@@ -270,20 +329,24 @@ router.post('/bank-transfer/initialize', verifyToken, async (req, res) => {
       ]
     );
 
-    // Get business bank details
-    const bankResponse = await paystack.initializeBankTransfer(
-      null,
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    const bankDetails = {
+      accountName: process.env.BUSINESS_BANK_ACCOUNT_NAME || 'ImpactKnowledge',
+      accountNumber: process.env.BUSINESS_BANK_ACCOUNT_NUMBER || '0000000000',
+      bankCode: process.env.BUSINESS_BANK_CODE || '',
+      bankName: process.env.BUSINESS_BANK_NAME || 'Business Bank',
       amount,
-      paymentReference,
-      { description }
-    );
+      transferReference:
+        `${process.env.BUSINESS_ACCOUNT_REFERENCE_PREFIX || 'IK'}_${paymentReference}`,
+      description: description || 'ImpactKnowledge transfer payment',
+    };
 
     res.json({
       success: true,
       reference: paymentReference,
       method: 'bank_transfer',
-      bankDetails: bankResponse.bankDetails,
-      expiresAt: bankResponse.expiresAt,
+      bankDetails,
+      expiresAt,
       instructions: [
         `Transfer exactly ${amount} to the account below`,
         `Use this reference in the transfer description: ${paymentReference}`,
@@ -444,6 +507,21 @@ router.post('/:reference/refund', verifyToken, async (req, res) => {
       });
     }
 
+    const metadata = paymentMetadata(payment);
+    let providerRefundId = null;
+    if (metadata.paymentIntentId) {
+      const refund = await stripe.createRefund({
+        paymentIntentId: metadata.paymentIntentId,
+        amount: refundAmount,
+        reason,
+        metadata: {
+          reference,
+          refundedBy: req.user.id,
+        },
+      });
+      providerRefundId = refund.id;
+    }
+
     await query(
       `UPDATE payments
        SET status = 'refunded',
@@ -461,6 +539,7 @@ router.post('/:reference/refund', verifyToken, async (req, res) => {
           refundedBy: req.user.id,
           amount: refundAmount,
           reason: reason || null,
+          providerRefundId,
         }),
         payment.id,
       ]
@@ -506,52 +585,32 @@ router.post('/:reference/refund', verifyToken, async (req, res) => {
 
 /**
  * POST /api/payments/webhook
- * Paystack webhook for payment confirmations
+ * Stripe webhook for payment confirmations
  */
 router.post('/webhook', async (req, res) => {
   try {
-    const signature = req.headers['x-paystack-signature'];
+    const signature = req.headers['stripe-signature'];
     const body = req.rawBody || JSON.stringify(req.body);
+    const event = stripe.verifyWebhookSignature(signature, body);
 
-    // Verify webhook signature
-    if (!paystack.verifyWebhookSignature(signature, body)) {
-      console.warn('Invalid webhook signature');
-      return res.status(401).json({ success: false, error: 'Invalid signature' });
-    }
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      const reference = session.metadata?.paymentReference;
 
-    const event = req.body;
+      if (!reference) {
+        return res.status(400).json({ success: false, error: 'Missing payment reference' });
+      }
 
-    if (event.event === 'charge.success') {
-      const data = event.data;
-      const reference = data.reference;
-
-      // Update payment status in DB
-      const paymentResult = await query(
-        `SELECT * FROM payments WHERE reference = $1`,
-        [reference]
-      );
-
+      const paymentResult = await query(`SELECT * FROM payments WHERE reference = $1`, [reference]);
       if (paymentResult.rows.length > 0) {
-        const payment = paymentResult.rows[0];
-
-        if (payment.status !== 'completed') {
-          // Mark as completed
-          await query(
-            `UPDATE payments SET status = 'completed', updated_at = NOW() WHERE reference = $1`,
-            [reference]
-          );
-
-          // Grant access
-          if (payment.item_type === 'course') {
-            await query(
-              `INSERT INTO enrollments (user_id, course_id, enrollment_date)
-               VALUES ($1, $2, NOW())
-               ON CONFLICT (user_id, course_id) DO NOTHING`,
-              [payment.user_id, payment.item_id]
-            );
-          }
-        }
-
+        await finalizePayment(paymentResult.rows[0], {
+          sessionId: session.id,
+          paymentIntentId:
+            typeof session.payment_intent === 'string'
+              ? session.payment_intent
+              : session.payment_intent?.id,
+          paidAt: new Date().toISOString(),
+        });
         console.log(`Payment ${reference} confirmed via webhook`);
       }
     }

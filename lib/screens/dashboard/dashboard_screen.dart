@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../config/role_dashboard_resolver.dart';
+import '../../config/service_locator.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/course_controller.dart';
 import '../../providers/achievement_controller.dart';
+import '../../services/dashboard/dashboard_service.dart';
 import '../../widgets/common/custom_widgets.dart';
 import '../../widgets/course/course_widgets.dart';
 import '../../config/routes.dart';
@@ -19,6 +21,33 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+
+  // Learner dashboard snapshot from backend (assignments, quizzes, stats).
+  Map<String, dynamic> _dashboardData = {};
+  bool _dashboardLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLearnerDashboard();
+  }
+
+  Future<void> _loadLearnerDashboard() async {
+    try {
+      final dashboardService = getIt<DashboardService>();
+      final data = await dashboardService.fetchLearnerDashboard();
+      if (mounted) {
+        setState(() {
+          _dashboardData = (data['data'] is Map<String, dynamic>)
+              ? data['data'] as Map<String, dynamic>
+              : data;
+          _dashboardLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _dashboardLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,245 +104,804 @@ class _DashboardScreenState extends State<DashboardScreen> {
     AuthController authController,
     CourseController courseController,
   ) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          DecoratedBox(
-            decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Welcome back,',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                      Obx(
-                        () => Text(
-                          authController.currentUser.value?.firstName ??
-                              'Learner',
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+    return RefreshIndicator(
+      color: AppTheme.primary400,
+      backgroundColor: AppTheme.dark700,
+      onRefresh: _loadLearnerDashboard,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header ──────────────────────────────────────────────────────
+            DecoratedBox(
+              decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Welcome back,',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textMuted,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  Obx(() {
-                    final user = authController.currentUser.value;
-                    final initials = _initials(user?.firstName, user?.lastName);
-                    return Container(
-                      width: 44,
-                      height: 44,
-                      decoration: const BoxDecoration(
-                        gradient: AppTheme.primaryGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        initials,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
+                        Obx(
+                          () => Text(
+                            authController.currentUser.value?.firstName ??
+                                'Learner',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Get.toNamed(AppRoutes.globalSearch),
+                          icon: const Icon(
+                            Icons.search,
+                            color: AppTheme.textLight,
+                          ),
+                          tooltip: 'Global Search',
+                        ),
+                        IconButton(
+                          onPressed: () => Get.toNamed(AppRoutes.notifications),
+                          icon: const Icon(
+                            Icons.notifications_none,
+                            color: AppTheme.textLight,
+                          ),
+                          tooltip: 'Notifications',
+                        ),
+                        Obx(() {
+                          final user = authController.currentUser.value;
+                          final initials = _initials(
+                            user?.firstName,
+                            user?.lastName,
+                          );
+                          return Container(
+                            width: 44,
+                            height: 44,
+                            decoration: const BoxDecoration(
+                              gradient: AppTheme.primaryGradient,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              initials,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Stats Strip ─────────────────────────────────────────────────
+            _buildStatsStrip(),
+
+            // ── Assignments Due ──────────────────────────────────────────────
+            _buildAssignmentsDue(),
+
+            // ── Available Quizzes ────────────────────────────────────────────
+            _buildAvailableQuizzes(),
+
+            // ── Continue Learning ────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Continue Learning',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Obx(() {
+                    if (courseController.enrolledCourses.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: AppTheme.darkCard(radius: 12),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.school_outlined,
+                              color: AppTheme.textMuted,
+                              size: 28,
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'No enrolled courses yet',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    return SizedBox(
+                      height: 210,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: courseController.enrolledCourses.length,
+                        itemBuilder: (context, index) {
+                          final enrollment =
+                              courseController.enrolledCourses[index];
+                          final matchedCourse = courseController.courses
+                              .firstWhereOrNull(
+                                (c) => c.id == enrollment.courseId,
+                              );
+                          final progress =
+                              (enrollment.progressPercentage ?? 0.0).clamp(
+                                0.0,
+                                100.0,
+                              );
+                          return GestureDetector(
+                            onTap: () {
+                              courseController.getCourseDetails(
+                                enrollment.courseId,
+                              );
+                              Get.toNamed(AppRoutes.courseDetail);
+                            },
+                            child: Container(
+                              width: 160,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: AppTheme.darkCard(radius: 12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      height: 72,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primary500.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.book_outlined,
+                                          color: AppTheme.primary400,
+                                          size: 30,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      matchedCourse?.title ?? 'Course',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.primary400,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const Spacer(),
+                                    // Progress bar
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          '${progress.toInt()}%',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.textMuted,
+                                          ),
+                                        ),
+                                        Text(
+                                          enrollment.status == 'completed'
+                                              ? '✓ Done'
+                                              : 'In Progress',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color:
+                                                enrollment.status == 'completed'
+                                                ? Colors.greenAccent
+                                                : AppTheme.textMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: progress / 100,
+                                        minHeight: 5,
+                                        backgroundColor: AppTheme.dark400,
+                                        valueColor:
+                                            const AlwaysStoppedAnimation(
+                                              AppTheme.primary500,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     );
                   }),
                 ],
               ),
             ),
-          ),
 
-          // Continue Learning
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Continue Learning',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Obx(() {
-                  if (courseController.enrolledCourses.isEmpty) {
-                    return Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: AppTheme.darkCard(radius: 12),
-                      child: const Row(
-                        children: [
-                          Icon(
-                            Icons.school_outlined,
-                            color: AppTheme.textMuted,
-                            size: 28,
-                          ),
-                          SizedBox(width: 12),
-                          Text(
-                            'No enrolled courses yet',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.textMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+            const SizedBox(height: 28),
 
-                  return SizedBox(
-                    height: 200,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: courseController.enrolledCourses.length,
-                      itemBuilder: (context, index) {
-                        final enrollment =
-                            courseController.enrolledCourses[index];
-                        return GestureDetector(
-                          onTap: () {
-                            courseController.getCourseDetails(
-                              enrollment.courseId,
-                            );
-                            Get.toNamed(AppRoutes.courseDetail);
-                          },
-                          child: Container(
-                            width: 160,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: AppTheme.darkCard(radius: 12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Container(
-                                    height: 80,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.primary500.withValues(
-                                        alpha: 0.15,
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Center(
-                                      child: Icon(
-                                        Icons.book_outlined,
-                                        color: AppTheme.primary400,
-                                        size: 32,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'In Progress',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: AppTheme.textMuted,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Expanded(
-                                    child: Text(
-                                      'Course',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppTheme.primary400,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 28),
-
-          // Browse Courses
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Browse Courses',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() => _selectedIndex = 1),
-                      child: const Text(
-                        'See All',
+            // ── Browse Courses ───────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Browse Courses',
                         style: TextStyle(
-                          fontSize: 14,
-                          color: AppTheme.primary400,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Obx(() {
-                  if (courseController.isLoading.value) {
-                    return const LoadingIndicator();
-                  }
-
-                  if (courseController.courses.isEmpty) {
-                    return const EmptyState(
-                      title: 'No Courses Available',
-                      subtitle: 'Check back later for new courses',
-                    );
-                  }
-
-                  return Column(
-                    children: courseController.courses
-                        .take(3)
-                        .map(
-                          (course) => CourseCard(
-                            course: course,
-                            onTap: () {
-                              courseController.getCourseDetails(course.id);
-                              Get.toNamed(AppRoutes.courseDetail);
-                            },
+                      GestureDetector(
+                        onTap: () => setState(() => _selectedIndex = 1),
+                        child: const Text(
+                          'See All',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.primary400,
+                            fontWeight: FontWeight.w600,
                           ),
-                        )
-                        .toList(),
-                  );
-                }),
-              ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Obx(() {
+                    if (courseController.isLoading.value) {
+                      return const LoadingIndicator();
+                    }
+
+                    if (courseController.courses.isEmpty) {
+                      return const EmptyState(
+                        title: 'No Courses Available',
+                        subtitle: 'Check back later for new courses',
+                      );
+                    }
+
+                    return Column(
+                      children: courseController.courses
+                          .take(3)
+                          .map(
+                            (course) => CourseCard(
+                              course: course,
+                              onTap: () {
+                                courseController.getCourseDetails(course.id);
+                                Get.toNamed(AppRoutes.courseDetail);
+                              },
+                            ),
+                          )
+                          .toList(),
+                    );
+                  }),
+                ],
+              ),
             ),
+
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Stats Strip ────────────────────────────────────────────────────────────
+  Widget _buildStatsStrip() {
+    if (_dashboardLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: LinearProgressIndicator(
+          color: AppTheme.primary500,
+          backgroundColor: AppTheme.dark400,
+        ),
+      );
+    }
+
+    final enrollmentCount = _dashboardData['enrollmentCount'] ?? 0;
+    final pendingAssignments =
+        (_dashboardData['pendingAssignments'] as List?)?.length ?? 0;
+    final availableQuizzes =
+        (_dashboardData['availableQuizzes'] as List?)?.length ?? 0;
+    final avgProgress = _dashboardData['avgProgress'] ?? 0;
+    final achievementCount = _dashboardData['achievementCount'] ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Row(
+        children: [
+          _statChip(
+            Icons.school_outlined,
+            '$enrollmentCount',
+            'Courses',
+            AppTheme.primary500,
+          ),
+          const SizedBox(width: 8),
+          _statChip(
+            Icons.assignment_late_outlined,
+            '$pendingAssignments',
+            'Due',
+            pendingAssignments > 0 ? Colors.orangeAccent : AppTheme.textMuted,
+          ),
+          const SizedBox(width: 8),
+          _statChip(
+            Icons.quiz_outlined,
+            '$availableQuizzes',
+            'Quizzes',
+            AppTheme.secondary400,
+          ),
+          const SizedBox(width: 8),
+          _statChip(
+            Icons.emoji_events_outlined,
+            '$achievementCount',
+            'Badges',
+            AppTheme.secondary500,
+          ),
+          const SizedBox(width: 8),
+          _statChip(
+            Icons.trending_up,
+            '$avgProgress%',
+            'Avg',
+            Colors.greenAccent,
           ),
         ],
       ),
     );
+  }
+
+  Widget _statChip(IconData icon, String value, String label, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: AppTheme.darkCard(radius: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Assignments Due ─────────────────────────────────────────────────────────
+  Widget _buildAssignmentsDue() {
+    final rawList = _dashboardData['pendingAssignments'];
+    if (rawList == null) return const SizedBox.shrink();
+    final assignments = (rawList as List).cast<Map<String, dynamic>>().toList();
+    if (assignments.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.assignment_late_outlined,
+                color: Colors.orangeAccent,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Assignments Due',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orangeAccent.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${assignments.length}',
+                  style: const TextStyle(
+                    color: Colors.orangeAccent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...assignments.take(3).map((a) => _assignmentRow(a)),
+        ],
+      ),
+    );
+  }
+
+  Widget _assignmentRow(Map<String, dynamic> assignment) {
+    final isOverdue = assignment['is_overdue'] == true;
+    final dueDate = _parseDueDate(assignment['due_date']?.toString());
+    final urgencyColor = isOverdue ? Colors.redAccent : Colors.orangeAccent;
+    final assignmentId = assignment['id']?.toString() ?? '';
+    final courseId = assignment['course_id']?.toString() ?? '';
+
+    return GestureDetector(
+      onTap: () {
+        if (assignmentId.isNotEmpty) {
+          Get.toNamed(
+            AppRoutes.assignmentDetail,
+            arguments: {'assignmentId': assignmentId, 'courseId': courseId},
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: AppTheme.darkCard(radius: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: urgencyColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                isOverdue ? Icons.assignment_late : Icons.assignment_outlined,
+                color: urgencyColor,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    assignment['title']?.toString() ?? 'Assignment',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textLight,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    assignment['course_title']?.toString() ?? '',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  isOverdue ? 'Overdue' : 'Due',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: urgencyColor,
+                  ),
+                ),
+                Text(
+                  dueDate,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        urgencyColor.withValues(alpha: 0.8),
+                        urgencyColor,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Submit',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Available Quizzes ───────────────────────────────────────────────────────
+  Widget _buildAvailableQuizzes() {
+    final rawList = _dashboardData['availableQuizzes'];
+    if (rawList == null) return const SizedBox.shrink();
+    final quizzes = (rawList as List).cast<Map<String, dynamic>>().toList();
+    if (quizzes.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.quiz_outlined,
+                color: AppTheme.secondary400,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Quizzes Available',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondary400.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${quizzes.length}',
+                  style: const TextStyle(
+                    color: AppTheme.secondary400,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...quizzes.take(3).map((q) => _quizRow(q)),
+        ],
+      ),
+    );
+  }
+
+  Widget _quizRow(Map<String, dynamic> quiz) {
+    final questionCount =
+        int.tryParse(quiz['question_count']?.toString() ?? '0') ?? 0;
+    final timeLimit = quiz['time_limit'];
+    final timeLimitStr = timeLimit != null ? '${timeLimit}m' : '—';
+    final quizId = quiz['id']?.toString() ?? '';
+    final courseId = quiz['course_id']?.toString() ?? '';
+    final timesPassed =
+        int.tryParse(quiz['times_passed']?.toString() ?? '0') ?? 0;
+    final alreadyPassed = timesPassed > 0;
+
+    return GestureDetector(
+      onTap: () {
+        if (quizId.isNotEmpty) {
+          Get.toNamed(
+            AppRoutes.quiz,
+            arguments: {'quizId': quizId, 'courseId': courseId},
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: AppTheme.darkCard(radius: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppTheme.secondary500.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                alreadyPassed ? Icons.check_circle_outline : Icons.quiz,
+                color: alreadyPassed
+                    ? Colors.greenAccent
+                    : AppTheme.secondary400,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    quiz['title']?.toString() ?? 'Quiz',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textLight,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    quiz['course_title']?.toString() ?? '',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textMuted,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.help_outline,
+                      size: 12,
+                      color: AppTheme.textMuted,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      '$questionCount Qs',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.timer_outlined,
+                      size: 12,
+                      color: AppTheme.textMuted,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      timeLimitStr,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: alreadyPassed
+                          ? [
+                              Colors.greenAccent.withValues(alpha: 0.7),
+                              Colors.greenAccent,
+                            ]
+                          : [
+                              AppTheme.secondary500.withValues(alpha: 0.8),
+                              AppTheme.secondary400,
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    alreadyPassed ? 'Retry' : 'Take Quiz',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Format a due date string to a short human-readable form.
+  String _parseDueDate(String? raw) {
+    if (raw == null) return '';
+    try {
+      final dt = DateTime.parse(raw).toLocal();
+      final now = DateTime.now();
+      final diff = dt.difference(now);
+      if (diff.isNegative) {
+        final days = diff.inDays.abs();
+        if (days == 0) return 'Today';
+        if (days == 1) return 'Yesterday';
+        return '${days}d ago';
+      } else {
+        if (diff.inHours < 24) return 'Today';
+        if (diff.inDays == 1) return 'Tomorrow';
+        return 'In ${diff.inDays}d';
+      }
+    } catch (_) {
+      return raw.substring(0, raw.length.clamp(0, 10));
+    }
   }
 
   Widget _buildCoursesTab(CourseController courseController) {
@@ -593,6 +1181,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
               'View Full Profile',
               Icons.person_outline,
               () => Get.toNamed(AppRoutes.profile),
+            ),
+            (
+              'Notifications',
+              Icons.notifications_none,
+              () => Get.toNamed(AppRoutes.notifications),
             ),
             (
               'Achievements',

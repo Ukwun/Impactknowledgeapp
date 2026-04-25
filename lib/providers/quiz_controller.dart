@@ -49,8 +49,8 @@ class QuizController extends GetxController {
       // Get quiz details
       final quizResponse = await apiService.getQuizDetail(quizId);
       currentQuiz.value = quizResponse is Map
-          ? Map<String, dynamic>.from(quizResponse as Map)
-          : Map<String, dynamic>.from(quizResponse as Map);
+          ? Map<String, dynamic>.from(quizResponse)
+          : <String, dynamic>{};
 
       // Get quiz questions
       final questionsResponse = await apiService.getQuizQuestions(quizId);
@@ -73,8 +73,8 @@ class QuizController extends GetxController {
       // Start attempt
       final attemptResponse = await apiService.startQuizAttempt(quizId);
       currentAttempt.value = attemptResponse is Map
-          ? Map<String, dynamic>.from(attemptResponse as Map)
-          : Map<String, dynamic>.from(attemptResponse as Map);
+          ? Map<String, dynamic>.from(attemptResponse)
+          : <String, dynamic>{};
 
       // Set up timer based on time limit
       final timeLimit = currentQuiz.value?['timeLimit'] ?? 60;
@@ -136,9 +136,7 @@ class QuizController extends GetxController {
       }
 
       final response = await apiService.getQuizAttemptDetail(attemptId);
-      return response is Map
-          ? response
-          : Map<String, dynamic>.from(response as Map);
+      return response is Map ? response : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to get results: ${e.toString()}';
       return null;
@@ -190,6 +188,27 @@ class QuizController extends GetxController {
       }
       return false;
     });
+  }
+
+  /// Load quizzes for all provided course IDs (dashboard overview use).
+  Future<void> loadMyQuizzes(List<String> courseIds) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+
+      final response = await apiService.getMyQuizzes(courseIds);
+      if (response is List) {
+        quizzes.value = response
+            .map<Map<String, dynamic>>(
+              (q) => Map<String, dynamic>.from(q as Map),
+            )
+            .toList();
+      }
+    } catch (e) {
+      error.value = 'Failed to load quizzes: ${e.toString()}';
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   @override

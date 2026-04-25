@@ -283,7 +283,7 @@ class PaymentService {
     required String reference,
   }) async {
     try {
-      final response = await apiService.get('/api/payments/$reference');
+      final response = await apiService.get('/api/payments/details/$reference');
 
       if (response['success'] == true) {
         logger.i('Retrieved payment: $reference');
@@ -303,7 +303,7 @@ class PaymentService {
   /// Get membership tiers
   Future<List<Map<String, dynamic>>> getMembershipTiers() async {
     try {
-      final response = await apiService.get('/api/payments/tiers');
+      final response = await apiService.get('/api/membership-tiers');
       if (response is List) {
         return List<Map<String, dynamic>>.from(response);
       }
@@ -318,11 +318,11 @@ class PaymentService {
   Future<List<Map<String, dynamic>>> getUserPayments({int limit = 10}) async {
     try {
       final response = await apiService.get(
-        '/api/payments/user',
-        queryParameters: {'limit': limit},
+        '/api/payments/history',
+        queryParameters: {'limit': limit, 'offset': 0},
       );
-      if (response is List) {
-        return List<Map<String, dynamic>>.from(response);
+      if (response is Map && response['data'] is List) {
+        return List<Map<String, dynamic>>.from(response['data'] as List);
       }
       return [];
     } catch (e) {
@@ -334,7 +334,11 @@ class PaymentService {
   /// Get user membership
   Future<Map<String, dynamic>?> getUserMembership() async {
     try {
-      return await apiService.get('/api/payments/membership');
+      final profile = await apiService.get('/api/users/me');
+      if (profile is Map<String, dynamic>) {
+        return profile['membership'] as Map<String, dynamic>?;
+      }
+      return null;
     } catch (e) {
       logger.e('Get user membership error: $e');
       return null;

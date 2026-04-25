@@ -2,6 +2,7 @@ import '../models/auth/user_model.dart';
 
 enum DashboardExperience {
   learner,
+  instructor,
   parent,
   facilitator,
   schoolAdmin,
@@ -19,8 +20,9 @@ class RoleDashboardResolver {
 
     switch (role) {
       case UserRole.student:
-      case UserRole.instructor:
         return DashboardExperience.learner;
+      case UserRole.instructor:
+        return DashboardExperience.instructor;
       case UserRole.parent:
         return DashboardExperience.parent;
       case UserRole.facilitator:
@@ -49,8 +51,9 @@ class RoleDashboardResolver {
       case UserRole.parent:
         return 'parent';
       case UserRole.facilitator:
-      case UserRole.instructor:
         return 'facilitator';
+      case UserRole.instructor:
+        return 'instructor';
       case UserRole.schoolAdmin:
         return 'school_admin';
       case UserRole.uniMember:
@@ -75,8 +78,9 @@ class RoleDashboardResolver {
       case 'parent':
         return UserRole.parent;
       case 'facilitator':
-      case 'instructor':
         return UserRole.facilitator;
+      case 'instructor':
+        return UserRole.instructor;
       case 'school_admin':
         return UserRole.schoolAdmin;
       case 'uni_member':

@@ -6,7 +6,7 @@ import '../../config/app_theme.dart';
 /// Example screen demonstrating all widget library components
 /// This serves as a comprehensive reference for developers
 class WidgetLibraryShowcase extends StatefulWidget {
-  const WidgetLibraryShowcase({Key? key}) : super(key: key);
+  const WidgetLibraryShowcase({super.key});
 
   @override
   State<WidgetLibraryShowcase> createState() => _WidgetLibraryShowcaseState();
@@ -297,7 +297,8 @@ class _WidgetLibraryShowcaseState extends State<WidgetLibraryShowcase> {
                   label: 'Description',
                   hintText: 'Describe your course',
                   isRequired: true,
-                  validator: FormValidators.validateMinLength,
+                  validator: (value) =>
+                      FormValidators.validateMinLength(value, 10),
                 ),
               ],
               submitLabel: 'Create Course',

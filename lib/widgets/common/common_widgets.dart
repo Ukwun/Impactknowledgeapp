@@ -50,5 +50,6 @@
 /// - Widgets use StatefulWidget only when necessary (e.g., AppTextField for obscure toggle)
 /// - All widgets are optimized for performance
 /// - Use const constructors where possible
+library;
 
 export 'app_widgets.dart';

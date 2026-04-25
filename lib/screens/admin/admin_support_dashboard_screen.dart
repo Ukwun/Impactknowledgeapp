@@ -3,7 +3,7 @@ import 'package:get_it/get_it.dart';
 import '../../services/support/support_service.dart';
 
 class AdminSupportDashboardScreen extends StatefulWidget {
-  const AdminSupportDashboardScreen({Key? key}) : super(key: key);
+  const AdminSupportDashboardScreen({super.key});
 
   @override
   State<AdminSupportDashboardScreen> createState() =>

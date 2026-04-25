@@ -10,12 +10,12 @@ class PaymentCheckoutScreen extends StatefulWidget {
   final String itemTitle;
 
   const PaymentCheckoutScreen({
-    Key? key,
+    super.key,
     required this.itemType,
     required this.itemId,
     required this.amount,
     required this.itemTitle,
-  }) : super(key: key);
+  });
 
   @override
   State<PaymentCheckoutScreen> createState() => _PaymentCheckoutScreenState();
@@ -172,7 +172,7 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
         ),
       );
 
-      // Launch Paystack payment URL
+      // Launch hosted checkout URL returned by the backend payment provider
       if (await canLaunch(response.paymentUrl)) {
         await launch(response.paymentUrl);
       }
@@ -234,9 +234,12 @@ class _PaymentMethodCard extends StatelessWidget {
       child: Card(
         margin: EdgeInsets.zero,
         color: isSelected ? Colors.deepPurple.withOpacity(0.1) : null,
-        border: isSelected
-            ? Border.all(color: Colors.deepPurple, width: 2)
-            : Border.all(color: Colors.grey[300]!),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: isSelected
+              ? const BorderSide(color: Colors.deepPurple, width: 2)
+              : BorderSide(color: Colors.grey[300]!),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -513,7 +516,7 @@ class _BankTransferDetailsScreen extends StatelessWidget {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
             ),

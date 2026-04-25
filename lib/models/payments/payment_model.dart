@@ -51,7 +51,8 @@ class Payment {
   final double amount;
   final String currency;
   final PaymentStatus status;
-  final String paymentMethod; // 'flutterwave', 'stripe', 'paypal'
+  final String
+  paymentMethod; // 'stripe', 'bank_transfer', or other backend-defined method
   final String? transactionId;
   final String? reference;
   final String? receiptUrl;

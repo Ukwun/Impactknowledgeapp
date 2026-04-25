@@ -4,6 +4,7 @@ import '../../../models/auth/user_model.dart';
 import 'admin_dashboard_screen.dart';
 import 'circle_member_dashboard_screen.dart';
 import 'facilitator_dashboard_screen.dart';
+import 'instructor_dashboard_screen.dart';
 import 'mentor_dashboard_screen.dart';
 import 'parent_dashboard_screen.dart';
 import 'school_admin_dashboard_screen.dart';
@@ -26,6 +27,8 @@ class RoleDashboardSwitcher extends StatelessWidget {
         return ParentDashboardScreen(firstName: firstName);
       case DashboardExperience.facilitator:
         return FacilitatorDashboardScreen(firstName: firstName);
+      case DashboardExperience.instructor:
+        return const InstructorDashboardScreen();
       case DashboardExperience.schoolAdmin:
         return SchoolAdminDashboardScreen(firstName: firstName);
       case DashboardExperience.mentor:

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../config/role_dashboard_resolver.dart';
 import '../../config/app_config.dart';
 import '../../models/auth/user_model.dart';
@@ -10,7 +9,6 @@ import 'dashboard_cache_service.dart';
 class DashboardService {
   final ApiService apiService;
   final DashboardCacheService cacheService;
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   DashboardService({required this.apiService, required this.cacheService});
 
@@ -19,6 +17,8 @@ class DashboardService {
       case DashboardExperience.parent:
         return fetchParentDashboard();
       case DashboardExperience.facilitator:
+        return fetchFacilitatorDashboard();
+      case DashboardExperience.instructor:
         return fetchFacilitatorDashboard();
       case DashboardExperience.schoolAdmin:
         return fetchSchoolAdminDashboard();
@@ -105,7 +105,7 @@ class DashboardService {
         final baseUrl = AppConfig.apiBaseUrl.endsWith('/')
             ? AppConfig.apiBaseUrl
             : '${AppConfig.apiBaseUrl}/';
-        final url = Uri.parse('${baseUrl}${endpoint}');
+        final url = Uri.parse('$baseUrl$endpoint');
 
         print('→ DASHBOARD REQUEST: GET $url');
 

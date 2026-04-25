@@ -3,14 +3,185 @@ import 'package:get/get.dart';
 import '../../providers/auth_controller.dart';
 import '../../config/routes.dart';
 import '../../config/app_theme.dart';
+import '../../config/service_locator.dart';
+import '../../services/api/api_service.dart';
+import '../../models/auth/user_model.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final authController = Get.find<AuthController>();
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
 
+class _ProfileScreenState extends State<ProfileScreen> {
+  final AuthController _authController = Get.find<AuthController>();
+  final ApiService _apiService = getIt<ApiService>();
+  bool _saving = false;
+
+  Future<void> _openEditProfile(UserProfile user) async {
+    final fullNameController = TextEditingController(text: user.fullName ?? '');
+    final phoneController = TextEditingController(text: user.phone ?? '');
+    final locationController = TextEditingController(text: user.state ?? '');
+    final bioController = TextEditingController(text: user.bio ?? '');
+    final avatarController = TextEditingController(text: user.avatarUrl ?? '');
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.dark700,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 16,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.textMuted.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Edit Profile',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _field(fullNameController, 'Full Name'),
+              _field(phoneController, 'Phone Number'),
+              _field(locationController, 'Location / State'),
+              _field(avatarController, 'Avatar URL'),
+              _field(bioController, 'Bio', minLines: 3, maxLines: 5),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          await _saveProfile(
+                            user,
+                            fullName: fullNameController.text.trim(),
+                            phone: phoneController.text.trim(),
+                            location: locationController.text.trim(),
+                            bio: bioController.text.trim(),
+                            avatarUrl: avatarController.text.trim(),
+                          );
+                          if (mounted) Navigator.of(context).pop();
+                        },
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'Saving...' : 'Save Changes'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    int minLines = 1,
+    int maxLines = 1,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextField(
+        controller: controller,
+        minLines: minLines,
+        maxLines: maxLines,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: AppTheme.textMuted),
+          filled: true,
+          fillColor: AppTheme.dark800,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveProfile(
+    UserProfile existing, {
+    required String fullName,
+    required String phone,
+    required String location,
+    required String bio,
+    required String avatarUrl,
+  }) async {
+    setState(() => _saving = true);
+    final response = await _apiService.updateMyProfile({
+      'full_name': fullName,
+      'phone_number': phone.isEmpty ? null : phone,
+      'location': location.isEmpty ? null : location,
+      'bio': bio.isEmpty ? null : bio,
+      'profile_picture_url': avatarUrl.isEmpty ? null : avatarUrl,
+    });
+
+    setState(() => _saving = false);
+
+    if (response['success'] == true) {
+      final updated = UserProfile(
+        id: existing.id,
+        email: existing.email,
+        fullName: fullName.isEmpty ? existing.fullName : fullName,
+        firstName: existing.firstName,
+        lastName: existing.lastName,
+        phone: phone.isEmpty ? existing.phone : phone,
+        state: location.isEmpty ? existing.state : location,
+        institution: existing.institution,
+        avatarUrl: avatarUrl.isEmpty ? existing.avatarUrl : avatarUrl,
+        bio: bio.isEmpty ? existing.bio : bio,
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now(),
+        role: existing.role,
+        emailVerified: existing.emailVerified,
+        accountStatus: existing.accountStatus,
+        countryOfResidence: existing.countryOfResidence,
+        professionOrStudyArea: existing.professionOrStudyArea,
+        reasonForJoining: existing.reasonForJoining,
+        membershipTierId: existing.membershipTierId,
+        referralCode: existing.referralCode,
+      );
+      _authController.currentUser.value = updated;
+      Get.snackbar('Profile updated', 'Your changes were saved successfully');
+    } else {
+      Get.snackbar(
+        'Update failed',
+        response['error']?.toString() ?? 'Unable to update profile',
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.dark800,
       appBar: AppBar(
@@ -22,7 +193,7 @@ class ProfileScreen extends StatelessWidget {
       body: DecoratedBox(
         decoration: const BoxDecoration(gradient: AppTheme.darkGradient),
         child: Obx(() {
-          final user = authController.currentUser.value;
+          final user = _authController.currentUser.value;
           if (user == null) {
             return const Center(
               child: Text(
@@ -39,7 +210,6 @@ class ProfileScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             child: Column(
               children: [
-                // ── Avatar + name + role ──
                 Container(
                   padding: const EdgeInsets.all(28),
                   decoration: AppTheme.darkCard(radius: 20),
@@ -64,7 +234,9 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '${user.firstName ?? ''} ${user.lastName ?? ''}'.trim(),
+                        (user.fullName ??
+                                '${user.firstName ?? ''} ${user.lastName ?? ''}')
+                            .trim(),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 22,
@@ -93,13 +265,16 @@ class ProfileScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => _openEditProfile(user),
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Edit Profile'),
+                      ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // ── Contact info ──
                 Container(
                   decoration: AppTheme.darkCard(radius: 16),
                   child: Column(
@@ -115,20 +290,12 @@ class ProfileScreen extends StatelessWidget {
                           'State',
                           user.state!,
                         ),
-                      if (user.institution != null &&
-                          user.institution!.isNotEmpty)
-                        _infoRow(
-                          Icons.school_outlined,
-                          'Institution',
-                          user.institution!,
-                        ),
+                      if (user.bio != null && user.bio!.isNotEmpty)
+                        _infoRow(Icons.info_outline, 'Bio', user.bio!),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // ── Account ──
                 Container(
                   decoration: AppTheme.darkCard(radius: 16),
                   child: Column(
@@ -148,10 +315,7 @@ class ProfileScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // ── Links ──
                 Container(
                   decoration: AppTheme.darkCard(radius: 16),
                   child: Column(
@@ -171,30 +335,28 @@ class ProfileScreen extends StatelessWidget {
                         'Membership',
                         () => Get.toNamed(AppRoutes.membership),
                       ),
+                      _menuRow(
+                        Icons.forum_outlined,
+                        'Community',
+                        () => Get.toNamed(AppRoutes.community),
+                      ),
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // ── Logout ──
                 _dangerButton(
                   Icons.logout,
                   'Sign Out',
-                  () async => await authController.logout(),
+                  () async => await _authController.logout(),
                   AppTheme.textMuted,
                 ),
-
                 const SizedBox(height: 12),
-
-                // ── Delete Account ──
                 _dangerButton(
                   Icons.delete_outline,
                   'Delete Account',
-                  () => _confirmDelete(context, authController),
+                  () => _confirmDelete(context, _authController),
                   AppTheme.danger500,
                 ),
-
                 const SizedBox(height: 32),
               ],
             ),
@@ -220,29 +382,32 @@ class ProfileScreen extends StatelessWidget {
   Widget _infoRow(IconData icon, String label, String value) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
     child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, color: AppTheme.primary400, size: 18),
         const SizedBox(width: 14),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: AppTheme.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            Text(
-              value,
-              style: const TextStyle(
-                color: AppTheme.textLight,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+              Text(
+                value,
+                style: const TextStyle(
+                  color: AppTheme.textLight,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     ),
@@ -331,7 +496,7 @@ class ProfileScreen extends StatelessWidget {
   String _initials(String? first, String? last) {
     final f = (first?.isNotEmpty ?? false) ? first![0].toUpperCase() : '';
     final l = (last?.isNotEmpty ?? false) ? last![0].toUpperCase() : '';
-    return f + l;
+    return (f + l).isNotEmpty ? (f + l) : 'U';
   }
 
   String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';

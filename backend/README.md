@@ -7,7 +7,7 @@ Node.js + Express backend API for the ImpactKnowledge Flutter mobile app.
 - **Authentication**: JWT-based auth with refresh tokens
 - **Courses**: Full CRUD operations, modules, lessons
 - **Achievements**: User achievements and leaderboards  
-- **Payments**: Flutterwave integration for course and membership payments
+- **Payments**: Stripe checkout for online payments plus offline bank-transfer instructions
 - **PostgreSQL**: Persistent data storage
 
 ## Prerequisites
@@ -32,7 +32,7 @@ Node.js + Express backend API for the ImpactKnowledge Flutter mobile app.
    - Copy `.env.example` to `.env`
    - Update database credentials with your Render PostgreSQL details
    - Set JWT_SECRET to a long random string
-   - Add Flutterwave credentials (optional for testing)
+   - Add Stripe credentials and webhook secret
 
 4. **Run locally**
    ```bash
@@ -151,15 +151,23 @@ curl -X POST https://your-api-url.onrender.com/api/auth/login \
 
 ## Seed Data
 
-You can add test data through the Flutter app or directly via API calls:
+Use the bundled production seed script to populate realistic launch data:
 
-1. Create courses
-2. Add modules to courses
-3. Add lessons to modules
-4. Create achievements
-5. Add membership tiers
+```bash
+npm run seed:production
+```
 
-For production, create a seed script in `src/seeds/seed.js`.
+This seeds:
+- role-based users
+- membership tiers
+- achievements
+- courses, modules, lessons
+- quizzes and answers
+- assignments
+- enrollments, analytics, and points
+- support tickets and notifications
+- parent/mentor relationships
+- role resources, partners, and testimonials
 
 ## Environment Variables
 
@@ -195,8 +203,8 @@ HTTP Status Codes:
 1. ✅ Deploy to Render
 2. ✅ Update Flutter app API URL
 3. ✅ Test signup/login flow
-4. ✅ Add seed data
-5. ✅ Configure Flutterwave for payments
+4. ✅ Run `npm run seed:production`
+5. ✅ Configure Stripe checkout and webhook delivery
 6. ✅ Add email notifications
 7. ✅ Add admin endpoints for creating courses
 

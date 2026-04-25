@@ -43,10 +43,8 @@ class AppConfig {
   static const String onboardingCompleted = 'onboarding_completed';
 
   /// Payment Configuration
-  static const String flutterwavePublicKey =
-      'FLUTTERWAVE_PUBLIC_KEY'; // Set from env
-  static const String flutterwaveSecretKey =
-      'FLUTTERWAVE_SECRET_KEY'; // Set from env
+  static const String stripePublishableKey =
+      'STRIPE_PUBLISHABLE_KEY'; // Set from env if needed for future native flows
 
   /// Firebase Configuration
   static const bool useFirebase = false; // Set to true if using Firebase

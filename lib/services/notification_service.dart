@@ -1,9 +1,10 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:logger/logger.dart';
-import 'dart:io';
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import '../config/service_locator.dart';
+import 'api/api_service.dart';
 
 /// Firebase Cloud Messaging & Push Notifications Service
 /// Handles FCM token management, message handling, and local notifications
@@ -14,6 +15,7 @@ class NotificationService {
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
+  final ApiService _apiService = getIt<ApiService>();
 
   String? _deviceToken;
   bool _isInitialized = false;
@@ -48,6 +50,16 @@ class NotificationService {
       // Get FCM token
       _deviceToken = await _fcm.getToken();
       _logger.i('📱 FCM Token: $_deviceToken');
+      if (_deviceToken != null && _deviceToken!.isNotEmpty) {
+        await _apiService.registerDeviceToken(_deviceToken!);
+      }
+
+      // Keep backend token in sync when Firebase rotates it.
+      _fcm.onTokenRefresh.listen((token) async {
+        _deviceToken = token;
+        await _apiService.registerDeviceToken(token);
+        _logger.i('🔄 Registered refreshed FCM token');
+      });
 
       // Setup message handlers
       await _setupMessageHandlers();
@@ -235,6 +247,9 @@ class NotificationService {
     try {
       _deviceToken = await _fcm.getToken();
       _logger.i('🔄 FCM token refreshed: $_deviceToken');
+      if (_deviceToken != null && _deviceToken!.isNotEmpty) {
+        await _apiService.registerDeviceToken(_deviceToken!);
+      }
       return _deviceToken;
     } catch (e) {
       _logger.e('❌ Error refreshing FCM token: $e');
@@ -311,13 +326,4 @@ class NotificationService {
   }) async {
     // Backend sends event reminder notification
   }
-}
-
-// Background message handler (must be a top-level function)
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  final logger = Logger();
-  logger.i('Handling a background message: ${message.messageId}');
-
-  // You can send another data event through event bus here
-  // or handle it in background through local notification
 }

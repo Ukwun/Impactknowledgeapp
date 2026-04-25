@@ -13,6 +13,19 @@ class EventController extends GetxController {
   final isLoading = false.obs;
   final error = RxString('');
 
+  Map<String, dynamic> _normalizeEvent(Map<String, dynamic> raw) {
+    final startDate = raw['startDate'] ?? raw['start_date'] ?? raw['date'];
+    final eventType = raw['eventType'] ?? raw['event_type'] ?? raw['type'];
+    return {
+      ...raw,
+      'id': (raw['id'] ?? '').toString(),
+      'date': startDate,
+      'type': eventType,
+      'registeredCount':
+          raw['registeredCount'] ?? raw['registrations_count'] ?? 0,
+    };
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -28,12 +41,12 @@ class EventController extends GetxController {
       final response = await apiService.getEvents();
       if (response is List) {
         events.value = List<Map<String, dynamic>>.from(
-          response.map((e) => e as Map<String, dynamic>),
-        );
+          response,
+        ).map(_normalizeEvent).toList();
       } else if (response is Map && response['success'] == true) {
         events.value = List<Map<String, dynamic>>.from(
-          (response['data'] as List).map((e) => e as Map<String, dynamic>),
-        );
+          response['data'] as List,
+        ).map(_normalizeEvent).toList();
       }
 
       // Separate upcoming events
@@ -55,12 +68,12 @@ class EventController extends GetxController {
       final response = await apiService.getRegisteredEvents();
       if (response is List) {
         registeredEvents.value = List<Map<String, dynamic>>.from(
-          response.map((e) => e as Map<String, dynamic>),
-        );
+          response,
+        ).map(_normalizeEvent).toList();
       } else if (response is Map && response['success'] == true) {
         registeredEvents.value = List<Map<String, dynamic>>.from(
-          (response['data'] as List).map((e) => e as Map<String, dynamic>),
-        );
+          response['data'] as List,
+        ).map(_normalizeEvent).toList();
       }
     } catch (e) {
       error.value = 'Failed to load registered events: ${e.toString()}';
@@ -78,12 +91,12 @@ class EventController extends GetxController {
       final response = await apiService.getUpcomingEvents();
       if (response is List) {
         upcomingEvents.value = List<Map<String, dynamic>>.from(
-          response.map((e) => e as Map<String, dynamic>),
-        );
+          response,
+        ).map(_normalizeEvent).toList();
       } else if (response is Map && response['success'] == true) {
         upcomingEvents.value = List<Map<String, dynamic>>.from(
-          (response['data'] as List).map((e) => e as Map<String, dynamic>),
-        );
+          response['data'] as List,
+        ).map(_normalizeEvent).toList();
       }
     } catch (e) {
       error.value = 'Failed to load upcoming events: ${e.toString()}';
@@ -99,8 +112,8 @@ class EventController extends GetxController {
 
       final response = await apiService.getEventDetail(eventId);
       currentEvent.value = response is Map
-          ? Map<String, dynamic>.from(response as Map)
-          : Map<String, dynamic>.from(response as Map);
+          ? _normalizeEvent(Map<String, dynamic>.from(response))
+          : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load event: ${e.toString()}';
       print('Error loading event: $e');
@@ -194,7 +207,7 @@ class EventController extends GetxController {
       error.value = '';
 
       final response = await apiService.getEventAttendees(eventId);
-      if (response != null && response is List) {
+      if (response != null) {
         return List<Map<String, dynamic>>.from(
           response.cast<Map<String, dynamic>>(),
         );
@@ -213,13 +226,65 @@ class EventController extends GetxController {
       error.value = '';
 
       final response = await apiService.getEventAnalytics(eventId);
-      return response is Map
-          ? response
-          : Map<String, dynamic>.from(response as Map);
+      return response is Map ? response : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load analytics: ${e.toString()}';
       print('Error loading analytics: $e');
       return null;
+    }
+  }
+
+  Future<bool> createEvent(Map<String, dynamic> data) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+      final response = await apiService.createEvent(data);
+      if (response?['success'] == true) {
+        await loadEvents();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      error.value = 'Failed to create event: ${e.toString()}';
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<bool> updateEvent(String eventId, Map<String, dynamic> data) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+      final response = await apiService.updateEvent(eventId, data);
+      if (response?['success'] == true) {
+        await loadEvents();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      error.value = 'Failed to update event: ${e.toString()}';
+      return false;
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<bool> deleteEvent(String eventId) async {
+    try {
+      isLoading.value = true;
+      error.value = '';
+      final response = await apiService.deleteEvent(eventId);
+      if (response?['success'] == true) {
+        events.removeWhere((e) => e['id'] == eventId);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      error.value = 'Failed to delete event: ${e.toString()}';
+      return false;
+    } finally {
+      isLoading.value = false;
     }
   }
 

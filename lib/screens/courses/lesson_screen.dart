@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../providers/course_controller.dart';
+import 'video_lesson_player_screen.dart';
 import '../../widgets/common/custom_widgets.dart';
 import '../../widgets/course/course_widgets.dart';
 
@@ -126,6 +127,59 @@ class _LessonScreenState extends State<LessonScreen> {
                           fontSize: 14,
                           color: Colors.grey[700],
                           height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+                    if (lesson.lessonType == 'video' &&
+                        lesson.videoUrl != null &&
+                        lesson.videoUrl.toString().isNotEmpty) ...[
+                      const Text(
+                        'Video Lesson',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          color: Colors.black87,
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.ondemand_video_outlined,
+                              size: 44,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Play this lesson inside the app',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => VideoLessonPlayerScreen(
+                                      title: lesson.title,
+                                      videoUrl: lesson.videoUrl!,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.play_circle_outline),
+                              label: const Text('Open Video Player'),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 24),

@@ -20,6 +20,8 @@ class DashboardService {
         return fetchParentDashboard();
       case DashboardExperience.facilitator:
         return fetchFacilitatorDashboard();
+      case DashboardExperience.instructor:
+        return fetchFacilitatorDashboard();
       case DashboardExperience.schoolAdmin:
         return fetchSchoolAdminDashboard();
       case DashboardExperience.mentor:
@@ -102,14 +104,14 @@ class DashboardService {
         final token = await _secureStorage.read(key: AppConfig.tokenKey);
 
         print(
-          '🔑 DASHBOARD TOKEN: ${token != null ? token.substring(0, 50) + '...' : 'NULL'}',
+          '🔑 DASHBOARD TOKEN: ${token != null ? '${token.substring(0, 50)}...' : 'NULL'}',
         );
 
         // Build proper URL
         final baseUrl = AppConfig.apiBaseUrl.endsWith('/')
             ? AppConfig.apiBaseUrl
             : '${AppConfig.apiBaseUrl}/';
-        final url = Uri.parse('${baseUrl}${endpoint}');
+        final url = Uri.parse('$baseUrl$endpoint');
 
         print('→ DASHBOARD: GET $url with Authorization header');
 

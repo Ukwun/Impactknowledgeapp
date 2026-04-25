@@ -31,9 +31,30 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     assignmentController = Get.put(AssignmentController());
     achievementController = Get.find<AchievementController>();
 
-    // Load initial data
-    courseController.loadEnrolledCourses();
-    achievementController.loadUserAchievements();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    await Future.wait([
+      courseController.fetchUserEnrollments(),
+      achievementController.fetchUserAchievements(),
+      courseController.fetchAllCourses(),
+    ]);
+
+    if (courseController.enrolledCourses.isNotEmpty) {
+      final firstCourseId = courseController.enrolledCourses.first.courseId;
+      await Future.wait([
+        quizController.loadQuizzesForCourse(firstCourseId),
+        assignmentController.loadAssignments(firstCourseId),
+      ]);
+    }
+  }
+
+  String _resolveCourseTitle(String courseId) {
+    final matched = courseController.courses.firstWhereOrNull(
+      (c) => c.id == courseId,
+    );
+    return matched?.title ?? 'Course';
   }
 
   @override
@@ -101,6 +122,12 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     return Obx(() {
       final enrolledCount = courseController.enrolledCourses.length;
       final achievementCount = achievementController.userAchievements.length;
+      final avgProgress = enrolledCount == 0
+          ? 0
+          : courseController.enrolledCourses
+                    .map((e) => e.progressPercentage ?? 0)
+                    .reduce((a, b) => a + b) /
+                enrolledCount;
 
       return Container(
         decoration: AppTheme.darkCard(),
@@ -118,7 +145,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               value: '$achievementCount',
               label: 'Badges',
             ),
-            _StatCard(icon: Icons.trending_up, value: '85%', label: 'Progress'),
+            _StatCard(
+              icon: Icons.trending_up,
+              value: '${avgProgress.toStringAsFixed(0)}%',
+              label: 'Progress',
+            ),
           ],
         ),
       );
@@ -180,7 +211,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
 
           return Column(
             children: courseController.enrolledCourses.take(3).map((course) {
-              final progress = course['progress_percentage'] ?? 0;
+              final progress = (course.progressPercentage ?? 0).toInt();
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: AppTheme.darkCard(radius: 12),
@@ -193,7 +224,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            course['title'] ?? 'Course',
+                            _resolveCourseTitle(course.courseId),
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
@@ -394,7 +425,15 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                       ),
                     ),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        final assignmentId = a['id']?.toString();
+                        if (assignmentId != null && assignmentId.isNotEmpty) {
+                          Get.toNamed(
+                            AppRoutes.assignmentDetail,
+                            arguments: assignmentId,
+                          );
+                        }
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red,
                         padding: const EdgeInsets.symmetric(
@@ -467,6 +506,11 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             children: achievementController.userAchievements.take(6).map((
               achievement,
             ) {
+              final achievementTitle =
+                  achievement.achievement?.title ?? 'Badge';
+              final displayText = achievementTitle.length > 10
+                  ? achievementTitle.substring(0, 10)
+                  : achievementTitle;
               return Container(
                 width: 80,
                 padding: const EdgeInsets.all(8),
@@ -474,19 +518,12 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                 child: Column(
                   children: [
                     Text(
-                      achievement['icon'] ?? '🏆',
+                      achievement.achievement?.icon ?? '🏆',
                       style: const TextStyle(fontSize: 32),
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      achievement['name']?.toString().substring(
-                            0,
-                            (achievement['name'].toString().length).clamp(
-                              0,
-                              10,
-                            ),
-                          ) ??
-                          'Badge',
+                      displayText,
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
