@@ -955,6 +955,76 @@ class ApiService {
     }
   }
 
+  // ==================== CLASSROOM BLUEPRINT ENDPOINTS ====================
+  Future<Map<String, dynamic>> getClassroomBlueprint() async {
+    try {
+      final response = await get('classroom/blueprint');
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false, 'data': {}};
+    } catch (e) {
+      logger.e('Error loading classroom blueprint: $e');
+      return {'success': false, 'data': {}};
+    }
+  }
+
+  Future<Map<String, dynamic>> getClassroomHierarchy() async {
+    try {
+      final response = await get('classroom/hierarchy');
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false, 'data': []};
+    } catch (e) {
+      logger.e('Error loading classroom hierarchy: $e');
+      return {'success': false, 'data': []};
+    }
+  }
+
+  Future<Map<String, dynamic>> createClassroomProgramme(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await post('classroom/programmes', data: payload);
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false};
+    } catch (e) {
+      logger.e('Error creating classroom programme: $e');
+      return {'success': false};
+    }
+  }
+
+  Future<Map<String, dynamic>> createClassroomLevel(
+    String programmeId,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await post(
+        'classroom/programmes/$programmeId/levels',
+        data: payload,
+      );
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false};
+    } catch (e) {
+      logger.e('Error creating classroom level: $e');
+      return {'success': false};
+    }
+  }
+
+  Future<Map<String, dynamic>> createClassroomCycle(
+    String levelId,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await post(
+        'classroom/levels/$levelId/cycles',
+        data: payload,
+      );
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false};
+    } catch (e) {
+      logger.e('Error creating classroom cycle: $e');
+      return {'success': false};
+    }
+  }
+
   // Token management
   Future<void> saveToken(String token) async {
     await _secureStorage.write(key: AppConfig.tokenKey, value: token);

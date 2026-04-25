@@ -86,6 +86,7 @@ app.use('/api/search', require('./src/routes/search'));
 app.use('/api/notifications', require('./src/routes/notifications'));
 app.use('/api/role-resources', require('./src/routes/role_resources'));
 app.use('/api/relationships', require('./src/routes/relationships'));
+app.use('/api/classroom', require('./src/routes/classroom'));
 
 // 404 handler
 app.use((req, res) => {

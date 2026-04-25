@@ -668,6 +668,194 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_role_resources_status ON role_resources(status);
     `).catch(() => {});
 
+    // Subscription classroom blueprint hierarchy
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_programmes (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(100) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        description TEXT,
+        delivery_model TEXT,
+        objectives JSONB,
+        online_classroom_structure JSONB,
+        curriculum_architecture JSONB,
+        live_facilitator_framework JSONB,
+        is_active BOOLEAN DEFAULT true,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_levels (
+        id SERIAL PRIMARY KEY,
+        programme_id INTEGER NOT NULL REFERENCES classroom_programmes(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        level_order INTEGER DEFAULT 1,
+        description TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(programme_id, name)
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_cycles (
+        id SERIAL PRIMARY KEY,
+        level_id INTEGER NOT NULL REFERENCES classroom_levels(id) ON DELETE CASCADE,
+        name VARCHAR(255) NOT NULL,
+        cycle_type VARCHAR(50) DEFAULT 'term',
+        start_date DATE,
+        end_date DATE,
+        status VARCHAR(50) DEFAULT 'planned',
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(level_id, name)
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE courses ADD COLUMN IF NOT EXISTS programme_id INTEGER REFERENCES classroom_programmes(id) ON DELETE SET NULL;
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE courses ADD COLUMN IF NOT EXISTS classroom_level_id INTEGER REFERENCES classroom_levels(id) ON DELETE SET NULL;
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE modules ADD COLUMN IF NOT EXISTS cycle_id INTEGER REFERENCES classroom_cycles(id) ON DELETE SET NULL;
+    `).catch(() => {});
+
+    await pool.query(`
+      ALTER TABLE lessons ADD COLUMN IF NOT EXISTS learning_layer VARCHAR(50) DEFAULT 'learn';
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_activities (
+        id SERIAL PRIMARY KEY,
+        lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+        activity_type VARCHAR(100) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        instructions TEXT,
+        resource_url VARCHAR(500),
+        metadata JSONB,
+        order_index INTEGER DEFAULT 1,
+        is_required BOOLEAN DEFAULT true,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_live_sessions (
+        id SERIAL PRIMARY KEY,
+        cycle_id INTEGER NOT NULL REFERENCES classroom_cycles(id) ON DELETE CASCADE,
+        module_id INTEGER REFERENCES modules(id) ON DELETE SET NULL,
+        title VARCHAR(255) NOT NULL,
+        session_type VARCHAR(100) DEFAULT 'facilitator_class',
+        facilitator_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        starts_at TIMESTAMP NOT NULL,
+        ends_at TIMESTAMP,
+        join_url VARCHAR(500),
+        capacity INTEGER,
+        status VARCHAR(50) DEFAULT 'scheduled',
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_assessments (
+        id SERIAL PRIMARY KEY,
+        cycle_id INTEGER NOT NULL REFERENCES classroom_cycles(id) ON DELETE CASCADE,
+        module_id INTEGER REFERENCES modules(id) ON DELETE SET NULL,
+        assessment_type VARCHAR(100) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        scoring_method VARCHAR(100) DEFAULT 'points',
+        max_score DECIMAL(10, 2),
+        pass_threshold DECIMAL(10, 2),
+        due_at TIMESTAMP,
+        metadata JSONB,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_showcases (
+        id SERIAL PRIMARY KEY,
+        cycle_id INTEGER NOT NULL REFERENCES classroom_cycles(id) ON DELETE CASCADE,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        submission_type VARCHAR(100) DEFAULT 'project',
+        visibility VARCHAR(50) DEFAULT 'private',
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS classroom_badges (
+        id SERIAL PRIMARY KEY,
+        assessment_id INTEGER REFERENCES classroom_assessments(id) ON DELETE SET NULL,
+        showcase_id INTEGER REFERENCES classroom_showcases(id) ON DELETE SET NULL,
+        title VARCHAR(255) NOT NULL,
+        badge_type VARCHAR(100) NOT NULL,
+        criteria TEXT,
+        certificate_template_url VARCHAR(500),
+        points_reward INTEGER DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_classroom_levels_programme ON classroom_levels(programme_id, level_order);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_classroom_cycles_level ON classroom_cycles(level_id, status);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_modules_cycle_id ON modules(cycle_id);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_lessons_learning_layer ON lessons(learning_layer);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_classroom_activities_lesson ON classroom_activities(lesson_id, order_index);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_classroom_live_sessions_cycle ON classroom_live_sessions(cycle_id, starts_at);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_classroom_assessments_cycle ON classroom_assessments(cycle_id, due_at);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_classroom_showcases_cycle ON classroom_showcases(cycle_id);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_classroom_badges_assessment ON classroom_badges(assessment_id);
+    `).catch(() => {});
+
     // Backfill rich content column for existing DBs
     await pool.query(`
       ALTER TABLE lessons ADD COLUMN IF NOT EXISTS content_body TEXT;
