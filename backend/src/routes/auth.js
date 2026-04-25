@@ -12,6 +12,10 @@ const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-jwt-refresh-s
 const TOKEN_EXPIRY = '24h';
 const REFRESH_TOKEN_EXPIRY = '7d';
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
 console.log('✅ AUTH USING REAL DATABASE WITH POSTGRESQL');
 
 // Helper function to generate tokens
@@ -37,9 +41,11 @@ router.post('/register', async (req, res) => {
   
   try {
     const { email, password, full_name, role = 'student' } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedName = String(full_name || '').trim();
 
     // Validation
-    if (!email || !password || !full_name) {
+    if (!normalizedEmail || !password || !normalizedName) {
       return res.status(400).json({ 
         success: false,
         error: 'Email, password, and full_name are required' 
@@ -55,8 +61,8 @@ router.post('/register', async (req, res) => {
 
     // Check if user already exists
     const existingResult = await query(
-      'SELECT id FROM users WHERE email = $1',
-      [email.toLowerCase()]
+      'SELECT id FROM users WHERE LOWER(TRIM(email)) = $1 LIMIT 1',
+      [normalizedEmail]
     );
 
     if (existingResult.rows.length > 0) {
@@ -75,7 +81,7 @@ router.post('/register', async (req, res) => {
       `INSERT INTO users (email, password_hash, full_name, role, created_at, updated_at)
        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING id, email, full_name, role, created_at, updated_at`,
-      [email.toLowerCase(), passwordHash, full_name, role]
+      [normalizedEmail, passwordHash, normalizedName, role]
     );
 
     const user = registerResult.rows[0];
@@ -121,9 +127,10 @@ router.post('/login', async (req, res) => {
   
   try {
     const { email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
     // Validation
-    if (!email || !password) {
+    if (!normalizedEmail || !password) {
       return res.status(400).json({ 
         success: false,
         error: 'Email and password are required' 
@@ -132,8 +139,8 @@ router.post('/login', async (req, res) => {
 
     // Find user
     const userResult = await query(
-      'SELECT id, email, password_hash, full_name, role FROM users WHERE email = $1',
-      [email.toLowerCase()]
+      'SELECT id, email, password_hash, full_name, role FROM users WHERE LOWER(TRIM(email)) = $1 LIMIT 1',
+      [normalizedEmail]
     );
 
     if (userResult.rows.length === 0) {

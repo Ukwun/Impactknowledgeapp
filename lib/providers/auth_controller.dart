@@ -81,6 +81,20 @@ class AuthController extends GetxController {
       currentUser.value = response.user;
       isLoggedIn.value = true;
     } catch (e) {
+      if (_isEmailAlreadyExistsError(e)) {
+        try {
+          // If account already exists for this email, proceed with sign-in
+          // so the user can continue without getting stuck.
+          final loginResponse = await authService.login(email, password);
+          currentUser.value = loginResponse.user;
+          isLoggedIn.value = true;
+          errorMessage.value = '';
+          return;
+        } catch (_) {
+          // Fall through to user-facing duplicate-email message.
+        }
+      }
+
       errorMessage.value = _toUserFacingAuthError(e);
       isLoggedIn.value = false;
     } finally {
@@ -148,6 +162,13 @@ class AuthController extends GetxController {
     errorMessage.value = '';
   }
 
+  bool _isEmailAlreadyExistsError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('already exists') ||
+        text.contains('email already') ||
+        text.contains('http 409');
+  }
+
   String _toUserFacingAuthError(Object error) {
     final text = error.toString().toLowerCase();
 
@@ -180,6 +201,10 @@ class AuthController extends GetxController {
       return '🚫 Endpoint not found (404).\n\n'
           'Server is reachable but the API endpoint doesn\'t exist.\n'
           'Error: $error';
+    }
+
+    if (_isEmailAlreadyExistsError(error)) {
+      return 'This email is already registered. Please sign in instead.';
     }
 
     return '⚠️ Error: $error';
