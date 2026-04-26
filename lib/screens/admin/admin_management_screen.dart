@@ -950,227 +950,185 @@ class _AdminManagementScreenState extends State<AdminManagementScreen>
                                   },
                                 ),
                               ],
-                              Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Wrap(
-                                      spacing: 10,
-                                      runSpacing: 8,
-                                      crossAxisAlignment:
-                                          WrapCrossAlignment.center,
-                                      children: [
-                                        DropdownButton<String>(
-                                          value: _moderationStatus,
-                                          items: const [
-                                            DropdownMenuItem(
-                                              value: 'pending',
-                                              child: Text('pending'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'approved',
-                                              child: Text('approved'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'rejected',
-                                              child: Text('rejected'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'all',
-                                              child: Text('all'),
-                                            ),
-                                          ],
-                                          onChanged: (v) async {
-                                            if (v == null) return;
-                                            setState(
-                                              () => _moderationStatus = v,
-                                            );
-                                            await _loadModeration();
-                                          },
-                                        ),
-                                        DropdownButton<String>(
-                                          value: _moderationContentType,
-                                          items: const [
-                                            DropdownMenuItem(
-                                              value: 'all',
-                                              child: Text('all types'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'course',
-                                              child: Text('course'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'lesson',
-                                              child: Text('lesson'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'comment',
-                                              child: Text('comment'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'user',
-                                              child: Text('user'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'assignment',
-                                              child: Text('assignment'),
-                                            ),
-                                          ],
-                                          onChanged: (v) async {
-                                            if (v == null) return;
-                                            setState(
-                                              () => _moderationContentType = v,
-                                            );
-                                            await _loadModeration();
-                                          },
-                                        ),
-                                        DropdownButton<String>(
-                                          value: _moderationReason,
-                                          items: const [
-                                            DropdownMenuItem(
-                                              value: 'all',
-                                              child: Text('all reasons'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'spam',
-                                              child: Text('spam'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'inappropriate',
-                                              child: Text('inappropriate'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'misleading',
-                                              child: Text('misleading'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'copyright',
-                                              child: Text('copyright'),
-                                            ),
-                                            DropdownMenuItem(
-                                              value: 'other',
-                                              child: Text('other'),
-                                            ),
-                                          ],
-                                          onChanged: (v) async {
-                                            if (v == null) return;
-                                            setState(
-                                              () => _moderationReason = v,
-                                            );
-                                            await _loadModeration();
-                                          },
-                                        ),
-                                        OutlinedButton.icon(
-                                          onPressed: _selectedFlagIds.isEmpty
-                                              ? null
-                                              : () => _bulkResolveSelectedFlags(
-                                                  'approved',
-                                                ),
-                                          icon: const Icon(
-                                            Icons.check_circle_outline,
-                                          ),
-                                          label: Text(
-                                            'Approve (${_selectedFlagIds.length})',
-                                          ),
-                                        ),
-                                        OutlinedButton.icon(
-                                          onPressed: _selectedFlagIds.isEmpty
-                                              ? null
-                                              : () => _bulkResolveSelectedFlags(
-                                                  'rejected',
-                                                ),
-                                          icon: const Icon(
-                                            Icons.cancel_outlined,
-                                          ),
-                                          label: const Text('Reject Selected'),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Pending: ${_moderationStats['pending_flags'] ?? 0} • Approved: ${_moderationStats['approved_flags'] ?? 0} • Rejected: ${_moderationStats['rejected_flags'] ?? 0}',
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Expanded(
-                                      child: RefreshIndicator(
-                                        onRefresh: _loadModeration,
-                                        child: ListView.builder(
-                                          itemCount: _moderationFlags.length,
-                                          itemBuilder: (context, index) {
-                                            final item =
-                                                _moderationFlags[index];
-                                            final id = item['id'] as int;
-                                            final selected = _selectedFlagIds
-                                                .contains(id);
-                                            return ListTile(
-                                              leading: Checkbox(
-                                                value: selected,
-                                                onChanged: (v) {
-                                                  if (v == true) {
-                                                    _selectedFlagIds.add(id);
-                                                  } else {
-                                                    _selectedFlagIds.remove(id);
-                                                  }
-                                                },
-                                              ),
-                                              title: Text(
-                                                '${item['content_type'] ?? 'content'} #${item['content_id'] ?? '-'} • ${item['reason'] ?? 'issue'}',
-                                              ),
-                                              subtitle: Text(
-                                                '${item['description'] ?? 'No description'}\nReported by: ${item['full_name'] ?? item['email'] ?? item['reported_by'] ?? '-'} • Status: ${item['status'] ?? 'pending'}',
-                                                maxLines: 3,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              isThreeLine: true,
-                                              trailing: Wrap(
-                                                spacing: 4,
-                                                children: [
-                                                  IconButton(
-                                                    tooltip: 'Approve',
-                                                    onPressed: () =>
-                                                        _resolveFlag(
-                                                          id,
-                                                          'approved',
-                                                        ),
-                                                    icon: const Icon(
-                                                      Icons.check_circle,
-                                                      color: Colors.green,
-                                                    ),
-                                                  ),
-                                                  IconButton(
-                                                    tooltip: 'Reject',
-                                                    onPressed: () =>
-                                                        _resolveFlag(
-                                                          id,
-                                                          'rejected',
-                                                        ),
-                                                    icon: const Icon(
-                                                      Icons.cancel,
-                                                      color: Colors.red,
-                                                    ),
-                                                  ),
-                                                  IconButton(
-                                                    tooltip: 'Reset to pending',
-                                                    onPressed: () =>
-                                                        _resolveFlag(
-                                                          id,
-                                                          'pending',
-                                                        ),
-                                                    icon: const Icon(
-                                                      Icons.hourglass_bottom,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      DropdownButton<String>(
+                        value: _moderationStatus,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'pending',
+                            child: Text('pending'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'approved',
+                            child: Text('approved'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'rejected',
+                            child: Text('rejected'),
+                          ),
+                          DropdownMenuItem(value: 'all', child: Text('all')),
+                        ],
+                        onChanged: (v) async {
+                          if (v == null) return;
+                          setState(() => _moderationStatus = v);
+                          await _loadModeration();
+                        },
+                      ),
+                      DropdownButton<String>(
+                        value: _moderationContentType,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'all',
+                            child: Text('all types'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'course',
+                            child: Text('course'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'lesson',
+                            child: Text('lesson'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'comment',
+                            child: Text('comment'),
+                          ),
+                          DropdownMenuItem(value: 'user', child: Text('user')),
+                          DropdownMenuItem(
+                            value: 'assignment',
+                            child: Text('assignment'),
+                          ),
+                        ],
+                        onChanged: (v) async {
+                          if (v == null) return;
+                          setState(() => _moderationContentType = v);
+                          await _loadModeration();
+                        },
+                      ),
+                      DropdownButton<String>(
+                        value: _moderationReason,
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'all',
+                            child: Text('all reasons'),
+                          ),
+                          DropdownMenuItem(value: 'spam', child: Text('spam')),
+                          DropdownMenuItem(
+                            value: 'inappropriate',
+                            child: Text('inappropriate'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'misleading',
+                            child: Text('misleading'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'copyright',
+                            child: Text('copyright'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'other',
+                            child: Text('other'),
+                          ),
+                        ],
+                        onChanged: (v) async {
+                          if (v == null) return;
+                          setState(() => _moderationReason = v);
+                          await _loadModeration();
+                        },
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _selectedFlagIds.isEmpty
+                            ? null
+                            : () => _bulkResolveSelectedFlags('approved'),
+                        icon: const Icon(Icons.check_circle_outline),
+                        label: Text('Approve (${_selectedFlagIds.length})'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _selectedFlagIds.isEmpty
+                            ? null
+                            : () => _bulkResolveSelectedFlags('rejected'),
+                        icon: const Icon(Icons.cancel_outlined),
+                        label: const Text('Reject Selected'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pending: ${_moderationStats['pending_flags'] ?? 0} • Approved: ${_moderationStats['approved_flags'] ?? 0} • Rejected: ${_moderationStats['rejected_flags'] ?? 0}',
+                  ),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: _loadModeration,
+                      child: ListView.builder(
+                        itemCount: _moderationFlags.length,
+                        itemBuilder: (context, index) {
+                          final item = _moderationFlags[index];
+                          final id = item['id'] as int;
+                          final selected = _selectedFlagIds.contains(id);
+                          return ListTile(
+                            leading: Checkbox(
+                              value: selected,
+                              onChanged: (v) {
+                                if (v == true) {
+                                  _selectedFlagIds.add(id);
+                                } else {
+                                  _selectedFlagIds.remove(id);
+                                }
+                              },
+                            ),
+                            title: Text(
+                              '${item['content_type'] ?? 'content'} #${item['content_id'] ?? '-'} • ${item['reason'] ?? 'issue'}',
+                            ),
+                            subtitle: Text(
+                              '${item['description'] ?? 'No description'}\nReported by: ${item['full_name'] ?? item['email'] ?? item['reported_by'] ?? '-'} • Status: ${item['status'] ?? 'pending'}',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            isThreeLine: true,
+                            trailing: Wrap(
+                              spacing: 4,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Approve',
+                                  onPressed: () => _resolveFlag(id, 'approved'),
+                                  icon: const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                  ),
                                 ),
-                              ),
+                                IconButton(
+                                  tooltip: 'Reject',
+                                  onPressed: () => _resolveFlag(id, 'rejected'),
+                                  icon: const Icon(
+                                    Icons.cancel,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Reset to pending',
+                                  onPressed: () => _resolveFlag(id, 'pending'),
+                                  icon: const Icon(Icons.hourglass_bottom),
+                                ),
+                              ],
                             ),
                           );
                         },

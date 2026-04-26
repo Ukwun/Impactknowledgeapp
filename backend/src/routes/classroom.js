@@ -119,6 +119,346 @@ const LIVE_FACILITATOR_FRAMEWORK = {
   ],
 };
 
+const FOUR_LEVEL_CURRICULUM_FRAMEWORK = [
+  {
+    key: 'primary',
+    level: 'Primary',
+    ageGroup: '7-11',
+    purpose: 'Build habits, values, awareness, and confidence.',
+    primaryOutcome: 'Habit formation',
+    signatureShift: 'From awareness to healthy daily money, behaviour, and teamwork habits.',
+    coreOutcomes: [
+      'Distinguish needs from wants.',
+      'Understand saving before spending.',
+      'Recognise simple buying and selling ideas.',
+      'Show honesty, responsibility, respect, and fairness.',
+      'Work with others and take simple initiative.',
+    ],
+    curriculumStrands: [
+      'My Money Habits',
+      'My Ideas and Small Business Thinking',
+      'My Leadership Habits',
+      'My Values and Community',
+    ],
+    suggestedTermStructure: [
+      {
+        term: 'Term 1',
+        focus: 'Money and Choices',
+        illustrativeTopics: [
+          'Needs vs wants',
+          'What money is',
+          'Saving before spending',
+          'Delayed gratification',
+          'Planning small spending choices',
+        ],
+      },
+      {
+        term: 'Term 2',
+        focus: 'Ideas, Work, and Value',
+        illustrativeTopics: [
+          'What a business is',
+          'Goods and services',
+          'Solving simple problems',
+          'Customer basics',
+          'Honesty in selling',
+        ],
+      },
+      {
+        term: 'Term 3',
+        focus: 'Leadership and Civil Values',
+        illustrativeTopics: [
+          'Confidence',
+          'Respect',
+          'Kindness',
+          'Responsibility',
+          'Doing the right thing',
+          'Community helper project',
+        ],
+      },
+    ],
+    signatureExperiences: [
+      'Class savings challenge',
+      'Mini market day',
+      'Story-based ethics circle',
+      'Young leader recognition',
+      'Family discussion prompt',
+    ],
+    liveClassroomFormat: {
+      frequency: 'One live class per week',
+      durationMinutes: 45,
+      format: 'Visual and highly interactive',
+      methods: [
+        'Polls',
+        'Role play',
+        'Guided discussion',
+        'Simple practical prompts',
+      ],
+    },
+    aliases: ['primary', 'primary school'],
+  },
+  {
+    key: 'junior_secondary',
+    level: 'Junior Secondary',
+    ageGroup: '12-14',
+    purpose: 'Build practical financial and enterprise habits.',
+    primaryOutcome: 'Practical application',
+    signatureShift: 'From understanding to budgeting, recording, and simple enterprise practice.',
+    coreOutcomes: [
+      'Create a simple budget.',
+      'Keep basic spending and sales records.',
+      'Estimate cost and understand price.',
+      'Recognise the difference between revenue, cost, and profit.',
+      'Practice responsibility, teamwork, and ethical decision making.',
+    ],
+    curriculumStrands: [
+      'Personal Money Management',
+      'Enterprise Practice',
+      'Leadership in Action',
+      'Civic Responsibility and Ethics',
+    ],
+    suggestedTermStructure: [
+      {
+        term: 'Term 1',
+        focus: 'Budgeting and Financial Discipline',
+        illustrativeTopics: [
+          'Income and allowance',
+          'Budget basics',
+          'Savings goals',
+          'Record keeping',
+          'Digital money awareness',
+          'Avoiding waste',
+        ],
+      },
+      {
+        term: 'Term 2',
+        focus: 'Enterprise Basics',
+        illustrativeTopics: [
+          'Problem identification',
+          'Creating an offer',
+          'Cost estimation',
+          'Pricing basics',
+          'Customer service',
+          'Profit awareness',
+        ],
+      },
+      {
+        term: 'Term 3',
+        focus: 'Leadership and Community Action',
+        illustrativeTopics: [
+          'Team roles',
+          'Accountability',
+          'Ethical choices',
+          'Conflict resolution',
+          'Group micro-enterprise challenge',
+        ],
+      },
+    ],
+    signatureExperiences: [
+      'Weekly budget journal',
+      'Sales and cost record sheet',
+      'Cost-and-price challenge',
+      'School micro-business simulation',
+      'Community problem-solving task',
+    ],
+    liveClassroomFormat: {
+      frequency: 'One live class per week',
+      durationMinutes: 60,
+      format: 'Moderator-supported and highly practical',
+      methods: [
+        'Chat engagement',
+        'Scenario work',
+        'Guided practice reviews',
+        'Monthly simulation session',
+      ],
+    },
+    aliases: ['junior secondary', 'jss', 'junior'],
+  },
+  {
+    key: 'senior_secondary',
+    level: 'Senior Secondary',
+    ageGroup: '15-18',
+    primaryOutcome: 'Enterprise readiness',
+    signatureShift: 'From business ideas to planning, projections, pitching, and investment awareness.',
+    purpose: 'Build enterprise readiness, financial confidence, and presentation ability.',
+    coreOutcomes: [
+      'Write a basic business plan',
+      'Prepare simple financial projections',
+      'Understand startup cost, pricing, margin, and cash flow logic',
+      'Participate in investment simulations',
+      'Present a business or project pitch with confidence',
+    ],
+    curriculumStrands: [
+      'Venture Design',
+      'Financial Planning and Projections',
+      'Leadership, Governance, and Influence',
+      'Investment and Pitch Readiness',
+    ],
+    suggestedTermStructure: [
+      {
+        term: 'Term 1',
+        focus: 'Business Design',
+        illustrativeTopics: [
+          'Opportunity identification',
+          'Market problem',
+          'Value proposition',
+          'Customer understanding',
+          'Business model basics',
+          'Operations',
+        ],
+      },
+      {
+        term: 'Term 2',
+        focus: 'Financial and Execution Readiness',
+        illustrativeTopics: [
+          'Startup cost planning',
+          'Pricing',
+          'Record keeping',
+          'Cash flow basics',
+          'Simple projections',
+          'Performance tracking',
+        ],
+      },
+      {
+        term: 'Term 3',
+        focus: 'Investment Simulation and Pitch',
+        illustrativeTopics: [
+          'Types of capital',
+          'Risk and return',
+          'Investment simulation',
+          'Pitch deck structure',
+          'Presentation skills',
+          'Demo day',
+        ],
+      },
+    ],
+    signatureExperiences: [
+      'Business plan builder',
+      'Projection worksheet',
+      'Investor simulation game',
+      'Peer pitch review',
+      'Quarterly virtual demo day',
+    ],
+    liveClassroomFormat: {
+      frequency: 'One live class per week',
+      durationMinutes: 75,
+      format: 'Enterprise coaching class with realistic venture scenarios',
+      methods: [
+        'Case-based venture review',
+        'Financial model walkthrough',
+        'Pitch practice and rebuttal',
+        'Monthly venture lab',
+        'Quarterly showcase with feedback rubrics',
+      ],
+      support: [
+        'Monthly venture lab',
+        'Quarterly showcase or pitch day',
+        'Structured feedback rubrics',
+      ],
+    },
+    aliases: ['senior secondary', 'sss', 'senior'],
+  },
+  {
+    key: 'impactuni',
+    level: 'ImpactUni',
+    ageGroup: '18+',
+    primaryOutcome: 'Execution and capital awareness',
+    signatureShift: 'From readiness to venture building, employability, and institutional engagement.',
+    aliases: ['impactuni', 'university', 'uni', 'campus'],
+  },
+];
+
+const CONTENT_OBJECT_FIELDS = [
+  { key: 'title', label: 'Title', description: 'Main content title used across CMS and classroom views.' },
+  { key: 'shortDescription', label: 'Short Description', description: 'Short summary shown in cards and release notices.' },
+  { key: 'programme', label: 'Programme and Level', description: 'Programme, level, and cohort context for the content.' },
+  { key: 'ageBand', label: 'Age Band', description: 'Target learner age band or maturity segment.' },
+  { key: 'subjectStrand', label: 'Subject Strand', description: 'Topic strand or competency area.' },
+  { key: 'termCycleModule', label: 'Term / Cycle and Module Number', description: 'Delivery timing and module sequencing reference.' },
+  { key: 'lessonType', label: 'Lesson Type', description: 'Lesson format such as explainer, worksheet, clinic, or simulation.' },
+  { key: 'learningObjectives', label: 'Learning Objectives', description: 'Observable outcomes learners should achieve.' },
+  { key: 'coreContentBody', label: 'Core Content Body', description: 'Primary instructional content body.' },
+  { key: 'facilitatorNotes', label: 'Facilitator Notes', description: 'Delivery guidance, prompts, and moderation notes.' },
+  { key: 'learnerInstructions', label: 'Learner Instructions', description: 'Actionable learner-facing instructions.' },
+  { key: 'downloadableResources', label: 'Downloadable Resources / Worksheets', description: 'Attached templates, worksheets, or supporting resources.' },
+  { key: 'quizItems', label: 'Quiz Items and Answer Rules', description: 'Assessment items and answer logic for quick checks.' },
+  { key: 'assignmentSubmissionType', label: 'Assignment Submission Type', description: 'Expected submission mode such as text, upload, or project link.' },
+  { key: 'liveSessionReference', label: 'Live Session Reference and Replay Link', description: 'Linked facilitator session and replay asset.' },
+  { key: 'assessmentWeighting', label: 'Assessment Weighting', description: 'Contribution to progress, score, or mastery calculation.' },
+  { key: 'badgeTrigger', label: 'Badge Trigger and Certificate Rule', description: 'Recognition criteria and certificate release rule.' },
+  { key: 'prerequisiteContent', label: 'Prerequisite Content', description: 'Required earlier content or dependency chain.' },
+  { key: 'completionStatus', label: 'Completion Status', description: 'Publication and learner completion lifecycle state.' },
+];
+
+const SUBSCRIPTION_DELIVERY_MODEL = {
+  pathways: [
+    {
+      mode: 'Individual Subscription',
+      primaryUser: 'Parent / learner',
+      requiredFeatures: [
+        'Personal dashboard',
+        'Level access',
+        'Live class booking',
+        'Progress tracking',
+        'Certificates',
+      ],
+    },
+    {
+      mode: 'School Subscription',
+      primaryUser: 'School admin / teachers / students',
+      requiredFeatures: [
+        'Cohort management',
+        'Attendance',
+        'Reporting',
+        'School dashboard',
+        'Facilitator scheduling',
+      ],
+    },
+    {
+      mode: 'Institutional / University Subscription',
+      primaryUser: 'Campus, department, student network, partner institution',
+      requiredFeatures: [
+        'Cohort enrolment',
+        'Advanced live sessions',
+        'ImpactUni studio delivery',
+        'Exportable reporting',
+      ],
+    },
+  ],
+  recommendedBlend: {
+    selfPacedStructuredContent: 60,
+    liveClassroomMentoringFacilitation: 25,
+    projectsSimulationsShowcasesCommunity: 15,
+  },
+};
+
+const WEEKLY_CLASSROOM_RHYTHM = [
+  {
+    dayStage: 'Monday – Learn',
+    learnerExperience: 'New lesson content is released.',
+    systemFunction: 'Unlock module materials and notify learners.',
+  },
+  {
+    dayStage: 'Tuesday – Practice',
+    learnerExperience: 'Learners complete worksheet, reflection, or practical task.',
+    systemFunction: 'Track submission or draft status.',
+  },
+  {
+    dayStage: 'Wednesday / Thursday – Live',
+    learnerExperience: 'Facilitator-led class deepens the topic.',
+    systemFunction: 'Attendance, polls, breakout groups, replay capture.',
+  },
+  {
+    dayStage: 'Friday – Assess',
+    learnerExperience: 'Quiz, short test, journal, or rubric-based challenge.',
+    systemFunction: 'Score and update progress dashboard.',
+  },
+  {
+    dayStage: 'Weekend – Reinforce',
+    learnerExperience: 'Replay, peer challenge, family prompt, or extension activity.',
+    systemFunction: 'Maintain retention and continuous engagement.',
+  },
+];
+
 function isClassroomManager(role) {
   return ['admin', 'school_admin', 'instructor', 'facilitator'].includes(role);
 }
@@ -413,7 +753,11 @@ router.get('/blueprint', async (req, res) => {
         onlineClassroomStructure: ONLINE_CLASSROOM_STRUCTURE,
         curriculumArchitecture: CURRICULUM_ARCHITECTURE,
         liveFacilitatorFramework: LIVE_FACILITATOR_FRAMEWORK,
+        fourLevelCurriculumFramework: FOUR_LEVEL_CURRICULUM_FRAMEWORK,
         learningArchitecture: LEARNING_LAYERS,
+        contentObjectFields: CONTENT_OBJECT_FIELDS,
+        subscriptionDeliveryModel: SUBSCRIPTION_DELIVERY_MODEL,
+        weeklyClassroomRhythm: WEEKLY_CLASSROOM_RHYTHM,
       },
     });
   } catch (err) {

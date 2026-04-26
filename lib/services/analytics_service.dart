@@ -254,7 +254,17 @@ class AnalyticsService {
     required String featureName,
     Map<String, dynamic>? parameters,
   }) {
-    _analytics.logEvent(name: featureName, parameters: parameters ?? {});
+    final typedParams = <String, Object>{};
+    parameters?.forEach((key, value) {
+      if (value != null) {
+        typedParams[key] = value;
+      }
+    });
+
+    _analytics.logEvent(
+      name: featureName,
+      parameters: typedParams.isEmpty ? null : typedParams,
+    );
     _logger.i('📊 Feature used: $featureName');
   }
 

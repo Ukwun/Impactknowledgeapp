@@ -28,6 +28,21 @@ class SchoolAdminDashboardScreen extends StatelessWidget {
           : const Duration(seconds: 30),
       builder: (context, data, isRefreshing, lastUpdated, reload) {
         final d = SchoolAdminDashboardData.fromJson(data);
+        final attendanceRate = _pickInt(data, [
+          'summary.cohortAttendanceRate',
+          'summary.attendanceRate',
+        ], fallback: d.completionRate);
+        final assignmentCompletion = _pickInt(data, [
+          'summary.assignmentCompletionRate',
+        ], fallback: d.completionRate);
+        final valuesRecognition = _pickInt(data, [
+          'summary.valuesRecognitionCount',
+          'summary.behaviourRecognitionCount',
+        ]);
+        final monthlyProgress = _pickInt(data, [
+          'summary.monthlyProgressSummary',
+          'summary.monthlyProgressPercent',
+        ], fallback: d.completionRate);
 
         return RoleDashboardScaffold(
           title: 'School Admin Dashboard',
@@ -64,6 +79,31 @@ class SchoolAdminDashboardScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            RoleDashboardStats(
+              stats: [
+                (
+                  'Cohort Attendance',
+                  '$attendanceRate%',
+                  Icons.how_to_reg_outlined,
+                ),
+                (
+                  'Assignment Completion',
+                  '$assignmentCompletion%',
+                  Icons.assignment_turned_in_outlined,
+                ),
+                (
+                  'Values Recognition',
+                  '$valuesRecognition',
+                  Icons.volunteer_activism_outlined,
+                ),
+                (
+                  'Monthly Progress',
+                  '$monthlyProgress%',
+                  Icons.calendar_month_outlined,
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             RoleActionTile(
               title: 'School Performance',
@@ -88,4 +128,33 @@ class SchoolAdminDashboardScreen extends StatelessWidget {
       },
     );
   }
+}
+
+int _pickInt(
+  Map<String, dynamic> data,
+  List<String> paths, {
+  int fallback = 0,
+}) {
+  for (final path in paths) {
+    dynamic current = data;
+    for (final key in path.split('.')) {
+      if (current is Map && current.containsKey(key)) {
+        current = current[key];
+      } else {
+        current = null;
+        break;
+      }
+    }
+    final value = _asInt(current);
+    if (value != null) return value;
+  }
+  return fallback;
+}
+
+int? _asInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
 }

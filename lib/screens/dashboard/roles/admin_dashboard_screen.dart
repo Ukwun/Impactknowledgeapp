@@ -28,6 +28,22 @@ class AdminDashboardScreen extends StatelessWidget {
           : const Duration(seconds: 30),
       builder: (context, data, isRefreshing, lastUpdated, reload) {
         final d = AdminDashboardData.fromJson(data);
+        final attendanceRate = _pickInt(data, [
+          'summary.cohortAttendanceRate',
+          'institutionStats.attendanceRate',
+        ], fallback: d.completionRate);
+        final assignmentCompletion = _pickInt(data, [
+          'summary.assignmentCompletionRate',
+          'platformStats.assignmentCompletionRate',
+        ], fallback: d.completionRate);
+        final valuesRecognition = _pickInt(data, [
+          'summary.valuesRecognitionCount',
+          'platformStats.valuesRecognitionCount',
+        ]);
+        final monthlyProgress = _pickInt(data, [
+          'summary.monthlyProgressSummary',
+          'platformStats.monthlyProgressPercent',
+        ], fallback: d.completionRate);
 
         return RoleDashboardScaffold(
           title: 'Admin Dashboard',
@@ -69,6 +85,31 @@ class AdminDashboardScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            RoleDashboardStats(
+              stats: [
+                (
+                  'Cohort Attendance',
+                  '$attendanceRate%',
+                  Icons.groups_2_outlined,
+                ),
+                (
+                  'Assignment Completion',
+                  '$assignmentCompletion%',
+                  Icons.assignment_turned_in_outlined,
+                ),
+                (
+                  'Values Recognition',
+                  '$valuesRecognition',
+                  Icons.stars_outlined,
+                ),
+                (
+                  'Monthly Progress',
+                  '$monthlyProgress%',
+                  Icons.query_stats_outlined,
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             RoleActionTile(
               title: 'Platform Analytics',
@@ -99,4 +140,33 @@ class AdminDashboardScreen extends StatelessWidget {
       },
     );
   }
+}
+
+int _pickInt(
+  Map<String, dynamic> data,
+  List<String> paths, {
+  int fallback = 0,
+}) {
+  for (final path in paths) {
+    dynamic current = data;
+    for (final key in path.split('.')) {
+      if (current is Map && current.containsKey(key)) {
+        current = current[key];
+      } else {
+        current = null;
+        break;
+      }
+    }
+    final value = _asInt(current);
+    if (value != null) return value;
+  }
+  return fallback;
+}
+
+int? _asInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
 }

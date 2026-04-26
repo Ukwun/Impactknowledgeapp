@@ -5,6 +5,7 @@ import '../../config/service_locator.dart';
 import '../../providers/auth_controller.dart';
 import '../../providers/course_controller.dart';
 import '../../providers/achievement_controller.dart';
+import '../../providers/classroom_controller.dart';
 import '../../services/dashboard/dashboard_service.dart';
 import '../../widgets/common/custom_widgets.dart';
 import '../../widgets/course/course_widgets.dart';
@@ -21,6 +22,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  late ClassroomController _classroomController;
 
   // Learner dashboard snapshot from backend (assignments, quizzes, stats).
   Map<String, dynamic> _dashboardData = {};
@@ -29,7 +31,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLearnerDashboard();
+    _classroomController = Get.isRegistered<ClassroomController>()
+        ? Get.find<ClassroomController>()
+        : Get.put(ClassroomController(), permanent: false);
+    _refreshHomeExperience();
+  }
+
+  Future<void> _refreshHomeExperience() async {
+    await Future.wait([
+      _loadLearnerDashboard(),
+      _classroomController.loadExperience(),
+    ]);
   }
 
   Future<void> _loadLearnerDashboard() async {
@@ -107,7 +119,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return RefreshIndicator(
       color: AppTheme.primary400,
       backgroundColor: AppTheme.dark700,
-      onRefresh: _loadLearnerDashboard,
+      onRefresh: _refreshHomeExperience,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
@@ -430,54 +442,309 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildClassroomJourney() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: AppTheme.darkCard(radius: 14),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.auto_stories_outlined,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Obx(() {
+      final programme = _classroomController.programmeName;
+      final level = _classroomController.currentLevelName;
+      final cycle = _classroomController.currentCycleName;
+      final moduleAndLesson = _currentModuleAndNextLesson();
+      final nextLiveSession = _nextLiveSessionText();
+      final progressPercent =
+          (_classroomController.taskProgress.clamp(0.0, 1.0) * 100).round();
+      final streakDays = _completionStreakDays();
+      final earnedBadges = _classroomController.badgesAndCertificates.length;
+      final certificateRules = _certificateRuleCount();
+      final unfinishedCount = _unfinishedActivityCount();
+      final nextDeadline = _nearestAssignmentDeadline();
+      final showcaseEntries = _showcaseEntryCount();
+      final announcements = _announcementItems();
+
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: AppTheme.darkCard(radius: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Text(
-                    'Guided Classroom',
-                    style: TextStyle(
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      gradient: AppTheme.primaryGradient,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.auto_stories_outlined,
                       color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
                     ),
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Live sessions, tasks, and badges in one learning flow.',
-                    style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Guided Classroom Journey',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Live sessions, tasks, badges, and progress in one active flow.',
+                          style: TextStyle(
+                            color: AppTheme.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => Get.toNamed(AppRoutes.learnerClassroom),
+                    child: const Text('Open'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _journeyLine(
+                Icons.school_outlined,
+                'Current Programme / Level',
+                '$programme • $level',
+              ),
+              _journeyLine(
+                Icons.view_timeline_outlined,
+                'Current Term / Module / Next Lesson',
+                '$cycle • ${moduleAndLesson['module']} • ${moduleAndLesson['lesson']}',
+              ),
+              _journeyLine(
+                Icons.video_call_outlined,
+                'Next Live Classroom Session',
+                nextLiveSession,
+              ),
+              _journeyLine(
+                Icons.local_fire_department_outlined,
+                'Progress & Completion Streak',
+                '$progressPercent% complete • $streakDays day streak',
+              ),
+              _journeyLine(
+                Icons.workspace_premium_outlined,
+                'Badges & Certificate Status',
+                '$earnedBadges earned • $certificateRules certificate rules active',
+              ),
+              _journeyLine(
+                Icons.pending_actions_outlined,
+                'Unfinished Activities & Deadlines',
+                '$unfinishedCount unfinished • next deadline $nextDeadline',
+              ),
+              _journeyLine(
+                Icons.collections_bookmark_outlined,
+                'Project Portfolio & Showcase Entries',
+                '$showcaseEntries showcase entries available',
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Announcements & Cohort Updates',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 6),
+              if (announcements.isEmpty)
+                const Text(
+                  'No cohort announcements yet. New updates will surface here.',
+                  style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                ),
+              ...announcements
+                  .take(3)
+                  .map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: Text(
+                        '• $item',
+                        style: const TextStyle(
+                          color: AppTheme.textLight,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _journeyLine(IconData icon, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: AppTheme.primary400),
+          const SizedBox(width: 8),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$title: ',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  TextSpan(
+                    text: value,
+                    style: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
-            OutlinedButton(
-              onPressed: () => Get.toNamed(AppRoutes.learnerClassroom),
-              child: const Text('Open'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  Map<String, String> _currentModuleAndNextLesson() {
+    if (_classroomController.hierarchy.isEmpty) {
+      return {'module': 'Module pending', 'lesson': 'Lesson pending'};
+    }
+
+    final programme = _classroomController.hierarchy.first;
+    final levels = programme['levels'];
+    if (levels is! List || levels.isEmpty) {
+      return {'module': 'Module pending', 'lesson': 'Lesson pending'};
+    }
+
+    final cycles = levels.first['cycles'];
+    if (cycles is! List || cycles.isEmpty) {
+      return {'module': 'Module pending', 'lesson': 'Lesson pending'};
+    }
+
+    final modules = cycles.first['modules'];
+    if (modules is! List || modules.isEmpty) {
+      return {'module': 'Module pending', 'lesson': 'Lesson pending'};
+    }
+
+    final firstModule = modules.first;
+    final moduleTitle = firstModule['title']?.toString() ?? 'Module pending';
+    final lessons = firstModule['lessons'];
+    final lessonTitle = (lessons is List && lessons.isNotEmpty)
+        ? (lessons.first['title']?.toString() ?? 'Lesson pending')
+        : 'Lesson pending';
+
+    return {'module': moduleTitle, 'lesson': lessonTitle};
+  }
+
+  String _nextLiveSessionText() {
+    final sessions = _classroomController.upcomingLiveSessions;
+    if (sessions.isEmpty) return 'No session scheduled yet';
+    final first = sessions.first;
+    final title = first['title']?.toString() ?? 'Live session';
+    final startsAt = first['starts_at']?.toString();
+    final date = startsAt != null ? _parseDueDate(startsAt) : 'Date pending';
+    return '$title ($date)';
+  }
+
+  int _completionStreakDays() {
+    final recent = _dashboardData['recentActivity'];
+    if (recent is List) {
+      return recent.length.clamp(0, 7);
+    }
+    return 0;
+  }
+
+  int _certificateRuleCount() {
+    return _classroomController.badgesAndCertificates
+        .where(
+          (item) =>
+              item['badge_type']?.toString() == 'certificate_rule' ||
+              item['badgeType']?.toString() == 'certificate_rule',
+        )
+        .length;
+  }
+
+  int _unfinishedActivityCount() {
+    return _classroomController.learnerTasks.where((task) {
+      final status = task['status']?.toString().toLowerCase() ?? 'pending';
+      return status != 'completed' && status != 'done';
+    }).length;
+  }
+
+  int _showcaseEntryCount() {
+    var count = 0;
+    for (final programme in _classroomController.hierarchy) {
+      final levels = programme['levels'];
+      if (levels is! List) continue;
+      for (final level in levels.whereType<Map>()) {
+        final cycles = level['cycles'];
+        if (cycles is! List) continue;
+        for (final cycle in cycles.whereType<Map>()) {
+          final showcases = cycle['showcases'];
+          if (showcases is List) {
+            count += showcases.length;
+          }
+        }
+      }
+    }
+    return count;
+  }
+
+  String _nearestAssignmentDeadline() {
+    final rawList = _dashboardData['pendingAssignments'];
+    if (rawList is! List || rawList.isEmpty) return 'none set';
+    final assignments = rawList.whereType<Map>().toList();
+    assignments.sort((a, b) {
+      final aTime = DateTime.tryParse(a['due_date']?.toString() ?? '');
+      final bTime = DateTime.tryParse(b['due_date']?.toString() ?? '');
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+      return aTime.compareTo(bTime);
+    });
+    return _parseDueDate(assignments.first['due_date']?.toString());
+  }
+
+  List<String> _announcementItems() {
+    final announcements = _dashboardData['announcements'];
+    if (announcements is List) {
+      return announcements
+          .map((item) {
+            if (item is Map) {
+              return item['title']?.toString() ?? item['message']?.toString();
+            }
+            return item?.toString();
+          })
+          .whereType<String>()
+          .where((text) => text.trim().isNotEmpty)
+          .toList();
+    }
+
+    final recent = _dashboardData['recentActivity'];
+    if (recent is List && recent.isNotEmpty) {
+      return recent
+          .whereType<Map>()
+          .map(
+            (activity) =>
+                '${activity['activity_type'] ?? 'activity'} (${activity['count'] ?? 0})',
+          )
+          .toList();
+    }
+
+    return const [];
   }
 
   // ── Stats Strip ────────────────────────────────────────────────────────────

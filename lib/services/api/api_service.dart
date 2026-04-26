@@ -545,7 +545,7 @@ class ApiService {
         'limit': limit,
         if (role != null) 'role': role,
         if (status != null) 'status': status,
-        if (search != null && search.isNotEmpty) 'search': search,
+        'search': (search != null && search.isNotEmpty) ? search : null,
       },
     );
   }
@@ -944,7 +944,7 @@ class ApiService {
         'payments/$reference/refund',
         data: {
           if (amount != null) 'amount': amount,
-          if (reason != null && reason.isNotEmpty) 'reason': reason,
+          'reason': (reason != null && reason.isNotEmpty) ? reason : null,
         },
       );
       if (response is Map<String, dynamic>) return response;
@@ -1022,6 +1022,53 @@ class ApiService {
     } catch (e) {
       logger.e('Error creating classroom cycle: $e');
       return {'success': false};
+    }
+  }
+
+  Future<Map<String, dynamic>> createClassroomActivity(
+    String lessonId,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await post(
+        'classroom/lessons/$lessonId/activities',
+        data: payload,
+      );
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false};
+    } catch (e) {
+      logger.e('Error creating classroom activity: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> createClassroomLiveSession(
+    String cycleId,
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await post(
+        'classroom/cycles/$cycleId/live-sessions',
+        data: payload,
+      );
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false};
+    } catch (e) {
+      logger.e('Error creating classroom live session: $e');
+      return {'success': false, 'error': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> createClassroomBadgeRule(
+    Map<String, dynamic> payload,
+  ) async {
+    try {
+      final response = await post('classroom/badges', data: payload);
+      if (response is Map<String, dynamic>) return response;
+      return {'success': false};
+    } catch (e) {
+      logger.e('Error creating classroom badge rule: $e');
+      return {'success': false, 'error': e.toString()};
     }
   }
 

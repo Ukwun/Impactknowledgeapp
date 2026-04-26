@@ -148,9 +148,6 @@ class NotificationService {
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
-      onDidReceiveLocalNotification: (id, title, body, payload) async {
-        _logger.i('iOS notification tapped: $title');
-      },
     );
 
     final InitializationSettings initSettings = InitializationSettings(
@@ -159,7 +156,7 @@ class NotificationService {
     );
 
     await _localNotifications.initialize(
-      initSettings,
+      settings: initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
         _logger.i('Local notification tapped: ${response.payload}');
         // Handle notification tap
@@ -203,10 +200,10 @@ class NotificationService {
       );
 
       await _localNotifications.show(
-        DateTime.now().millisecond,
-        title,
-        body,
-        details,
+        id: DateTime.now().millisecond,
+        title: title,
+        body: body,
+        notificationDetails: details,
         payload: payload.toString(),
       );
 

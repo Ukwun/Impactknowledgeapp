@@ -63,7 +63,7 @@ flutter {
 }
 
 dependencies {
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     
     // Firebase BOM (Bill of Materials) - ensures compatible versions
     implementation(platform("com.google.firebase:firebase-bom:32.7.4"))

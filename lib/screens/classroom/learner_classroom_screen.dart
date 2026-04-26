@@ -47,6 +47,12 @@ class _LearnerClassroomScreenState extends State<LearnerClassroomScreen> {
               const SizedBox(height: 16),
               _LayerPanel(controller: classroomController),
               const SizedBox(height: 16),
+              _CurriculumFrameworkPanel(controller: classroomController),
+              const SizedBox(height: 16),
+              _SubscriptionDeliveryPanel(controller: classroomController),
+              const SizedBox(height: 16),
+              _WeeklyRhythmPanel(controller: classroomController),
+              const SizedBox(height: 16),
               _TaskProgressPanel(controller: classroomController),
               const SizedBox(height: 16),
               _LiveSessionsPanel(controller: classroomController),
@@ -302,6 +308,289 @@ class _TaskProgressPanel extends StatelessWidget {
   }
 }
 
+class _CurriculumFrameworkPanel extends StatelessWidget {
+  final ClassroomController controller;
+
+  const _CurriculumFrameworkPanel({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final framework = controller.fourLevelCurriculumFramework;
+    final current = controller.currentCurriculumLevelProfile;
+
+    return Container(
+      decoration: AppTheme.darkCard(),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Four-Level Curriculum Framework',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (current.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppTheme.primary500.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: AppTheme.primary500.withValues(alpha: 0.35),
+                ),
+              ),
+              child: Text(
+                'Current pathway: ${current['level'] ?? controller.currentLevelName} (${current['ageGroup'] ?? ''}) - ${current['primaryOutcome'] ?? ''}',
+                style: const TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ),
+          const SizedBox(height: 10),
+          if (framework.isEmpty)
+            const Text(
+              'Curriculum framework details are not available yet.',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
+          ...framework.map((item) {
+            final isCurrent =
+                current['key']?.toString() == item['key']?.toString();
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.dark600,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isCurrent
+                      ? AppTheme.success500.withValues(alpha: 0.45)
+                      : AppTheme.dark500,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${item['level'] ?? 'Level'} (${item['ageGroup'] ?? ''})',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      if (isCurrent)
+                        const Icon(
+                          Icons.check_circle,
+                          color: AppTheme.success500,
+                          size: 18,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Outcome: ${item['primaryOutcome'] ?? ''}',
+                    style: const TextStyle(
+                      color: AppTheme.primary400,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item['signatureShift']?.toString() ?? '',
+                    style: const TextStyle(
+                      color: AppTheme.textLight,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionDeliveryPanel extends StatelessWidget {
+  final ClassroomController controller;
+
+  const _SubscriptionDeliveryPanel({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final pathways = controller.subscriptionPathways;
+    final blend = controller.recommendedDeliveryBlend;
+
+    return Container(
+      decoration: AppTheme.darkCard(),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Subscription Delivery Model',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (pathways.isEmpty)
+            const Text(
+              'Subscription pathways are being prepared for this classroom.',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
+          ...pathways.map((pathway) {
+            final features = pathway['requiredFeatures'];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.dark600,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    pathway['mode']?.toString() ?? 'Mode',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    pathway['primaryUser']?.toString() ?? '',
+                    style: const TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (features is List)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: features
+                          .map(
+                            (feature) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.dark700,
+                                borderRadius: BorderRadius.circular(18),
+                              ),
+                              child: Text(
+                                feature.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                ],
+              ),
+            );
+          }),
+          if (blend.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _BlendChip(
+                  label: 'Self-paced',
+                  value: '${blend['selfPacedStructuredContent'] ?? 0}%',
+                  color: AppTheme.info500,
+                ),
+                _BlendChip(
+                  label: 'Live / Mentoring',
+                  value: '${blend['liveClassroomMentoringFacilitation'] ?? 0}%',
+                  color: AppTheme.success500,
+                ),
+                _BlendChip(
+                  label: 'Projects / Showcase',
+                  value:
+                      '${blend['projectsSimulationsShowcasesCommunity'] ?? 0}%',
+                  color: AppTheme.secondary500,
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeeklyRhythmPanel extends StatelessWidget {
+  final ClassroomController controller;
+
+  const _WeeklyRhythmPanel({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final rhythm = controller.weeklyClassroomRhythm;
+
+    return Container(
+      decoration: AppTheme.darkCard(),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Weekly Classroom Rhythm',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (rhythm.isEmpty)
+            const Text(
+              'Your weekly rhythm will appear here when published.',
+              style: TextStyle(color: AppTheme.textMuted),
+            ),
+          ...rhythm.map((item) {
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(
+                Icons.calendar_today_outlined,
+                color: AppTheme.primary400,
+                size: 18,
+              ),
+              title: Text(
+                item['dayStage']?.toString() ?? 'Stage',
+                style: const TextStyle(color: Colors.white),
+              ),
+              subtitle: Text(
+                '${item['learnerExperience'] ?? ''}\n${item['systemFunction'] ?? ''}',
+                style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+              ),
+              isThreeLine: true,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
 class _LiveSessionsPanel extends StatelessWidget {
   final ClassroomController controller;
 
@@ -497,6 +786,38 @@ class _ErrorView extends StatelessWidget {
               label: const Text('Retry'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BlendChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _BlendChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

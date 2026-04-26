@@ -28,6 +28,18 @@ class ParentDashboardScreen extends StatelessWidget {
           : const Duration(seconds: 30),
       builder: (context, data, isRefreshing, lastUpdated, reload) {
         final d = ParentDashboardData.fromJson(data);
+        final assignmentCompletion = _pickInt(data, [
+          'summary.assignmentCompletionRate',
+          'oversight.assignmentCompletionRate',
+        ], fallback: d.avgProgress);
+        final valuesRecognition = _pickInt(data, [
+          'summary.valuesRecognitionCount',
+          'oversight.valuesRecognitionCount',
+        ]);
+        final monthlyProgress = _pickInt(data, [
+          'summary.monthlyProgressSummary',
+          'summary.monthlyProgressPercent',
+        ], fallback: d.avgProgress);
 
         return RoleDashboardScaffold(
           title: 'Parent Dashboard',
@@ -68,6 +80,31 @@ class ParentDashboardScreen extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            RoleDashboardStats(
+              stats: [
+                (
+                  'Cohort Attendance',
+                  '${d.attendanceRate}%',
+                  Icons.fact_check_outlined,
+                ),
+                (
+                  'Assignment Completion',
+                  '$assignmentCompletion%',
+                  Icons.assignment_turned_in_outlined,
+                ),
+                (
+                  'Values Recognition',
+                  '$valuesRecognition',
+                  Icons.volunteer_activism_outlined,
+                ),
+                (
+                  'Monthly Progress',
+                  '$monthlyProgress%',
+                  Icons.calendar_month_outlined,
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             RoleActionTile(
               title: 'Child Learning Progress',
@@ -97,4 +134,33 @@ class ParentDashboardScreen extends StatelessWidget {
       },
     );
   }
+}
+
+int _pickInt(
+  Map<String, dynamic> data,
+  List<String> paths, {
+  int fallback = 0,
+}) {
+  for (final path in paths) {
+    dynamic current = data;
+    for (final key in path.split('.')) {
+      if (current is Map && current.containsKey(key)) {
+        current = current[key];
+      } else {
+        current = null;
+        break;
+      }
+    }
+    final value = _asInt(current);
+    if (value != null) return value;
+  }
+  return fallback;
+}
+
+int? _asInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
 }
