@@ -65,6 +65,7 @@ class _FacilitatorClassroomScreenState
             classroomController.levelTwoJuniorSecondaryBlueprint;
         final seniorBlueprint =
             classroomController.levelThreeSeniorSecondaryBlueprint;
+        final uniBlueprint = classroomController.levelFourImpactUniBlueprint;
 
         return RefreshIndicator(
           color: AppTheme.primary500,
@@ -434,6 +435,47 @@ class _FacilitatorClassroomScreenState
                           _liveFormatPanel(
                             seniorBlueprint['liveClassroomFormat'],
                           ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 16),
+              _SectionCard(
+                title: 'Level 4 - ImpactUni Implementation Blueprint',
+                child: uniBlueprint.isEmpty
+                    ? const Text(
+                        'ImpactUni implementation details are not available yet.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _infoBlock(
+                            'Purpose',
+                            uniBlueprint['purpose']?.toString() ??
+                                'Move learners from knowledge to execution, employability, venture building, and capital awareness.',
+                          ),
+                          _chipList(
+                            title: 'Core Outcomes',
+                            values: uniBlueprint['coreOutcomes'],
+                          ),
+                          const SizedBox(height: 10),
+                          _chipList(
+                            title: 'Curriculum Strands',
+                            values: uniBlueprint['curriculumStrands'],
+                            color: AppTheme.secondary500,
+                          ),
+                          const SizedBox(height: 10),
+                          _termStructurePanel(
+                            uniBlueprint['suggestedTermStructure'],
+                          ),
+                          const SizedBox(height: 10),
+                          _chipList(
+                            title: 'Signature Experiences',
+                            values: uniBlueprint['signatureExperiences'],
+                            color: AppTheme.success500,
+                          ),
+                          const SizedBox(height: 10),
+                          _liveFormatPanel(uniBlueprint['liveClassroomFormat']),
                         ],
                       ),
               ),
@@ -1228,6 +1270,7 @@ class _FacilitatorClassroomScreenState
         classroomController.levelTwoJuniorSecondaryBlueprint;
     final seniorBlueprint =
         classroomController.levelThreeSeniorSecondaryBlueprint;
+    final uniBlueprint = classroomController.levelFourImpactUniBlueprint;
 
     final templateBlueprints = <Map<String, dynamic>>[
       if (primaryBlueprint.isNotEmpty)
@@ -1247,6 +1290,12 @@ class _FacilitatorClassroomScreenState
           'id': 'senior_secondary',
           'title': 'Level 3 - Senior Secondary (15-18)',
           'blueprint': seniorBlueprint,
+        },
+      if (uniBlueprint.isNotEmpty)
+        {
+          'id': 'impactuni',
+          'title': 'ImpactUni (18+)',
+          'blueprint': uniBlueprint,
         },
     ];
 
@@ -2030,6 +2079,7 @@ class _FacilitatorClassroomScreenState
 
     return DropdownButtonFormField<String>(
       key: fieldKey,
+      isExpanded: true,
       initialValue: safeValue,
       dropdownColor: AppTheme.dark700,
       style: const TextStyle(color: Colors.white),

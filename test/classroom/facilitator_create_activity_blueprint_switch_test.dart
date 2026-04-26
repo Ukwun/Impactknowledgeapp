@@ -98,6 +98,31 @@ void main() {
             'methods': ['Pitch practice'],
           },
         },
+        {
+          'key': 'impactuni',
+          'level': 'ImpactUni',
+          'ageGroup': '18+',
+          'coreOutcomes': [
+            'Manage personal finance and career capital',
+            'Design and validate a venture or innovation project',
+          ],
+          'curriculumStrands': [
+            'Personal Finance and Career Capital',
+            'Venture Building and Innovation',
+          ],
+          'suggestedTermStructure': [
+            {
+              'term': 'Term 1',
+              'focus': 'Personal and Professional Capital',
+              'illustrativeTopics': ['Budgeting', 'Career positioning'],
+            },
+          ],
+          'liveClassroomFormat': {
+            'frequency': 'One 90-minute masterclass per week',
+            'durationMinutes': 90,
+            'methods': ['Masterclass', 'Peer feedback'],
+          },
+        },
       ],
     });
 
@@ -190,4 +215,144 @@ void main() {
           'Title should be autofilled with "Venture Design - Business Design" after selecting Senior Secondary',
     );
   });
+
+  testWidgets(
+    'Create Activity supports Blueprint Track switching to ImpactUni Level 4',
+    (tester) async {
+      final controller = _TestClassroomController();
+
+      controller.blueprint.assignAll({
+        'fourLevelCurriculumFramework': [
+          {
+            'key': 'primary',
+            'level': 'Primary',
+            'ageGroup': '7-11',
+            'coreOutcomes': ['Build money awareness'],
+            'curriculumStrands': ['My Money Habits'],
+            'suggestedTermStructure': [
+              {
+                'term': 'Term 1',
+                'focus': 'Foundation Habits',
+                'illustrativeTopics': ['Needs vs wants'],
+              },
+            ],
+            'liveClassroomFormat': {
+              'frequency': 'One live class per week',
+              'durationMinutes': 45,
+              'methods': ['Guided discussion'],
+            },
+          },
+          {
+            'key': 'impactuni',
+            'level': 'ImpactUni',
+            'ageGroup': '18+',
+            'coreOutcomes': [
+              'Manage personal finance and career capital',
+              'Design and validate a venture or innovation project',
+            ],
+            'curriculumStrands': [
+              'Personal Finance and Career Capital',
+              'Venture Building and Innovation',
+            ],
+            'suggestedTermStructure': [
+              {
+                'term': 'Term 1',
+                'focus': 'Personal and Professional Capital',
+                'illustrativeTopics': ['Budgeting', 'Career positioning'],
+              },
+            ],
+            'liveClassroomFormat': {
+              'frequency': 'One 90-minute masterclass per week',
+              'durationMinutes': 90,
+              'methods': ['Masterclass', 'Peer feedback'],
+            },
+          },
+        ],
+      });
+
+      controller.hierarchy.assignAll([
+        {
+          'name': 'Impact Classroom',
+          'levels': [
+            {
+              'name': 'ImpactUni',
+              'cycles': [
+                {
+                  'id': 'cycle-uni-1',
+                  'name': 'Cycle 1',
+                  'modules': [
+                    {
+                      'title': 'Module 1',
+                      'lessons': [
+                        {
+                          'id': 'lesson-uni-1',
+                          'title': 'Lesson 1',
+                          'layer': 'learn',
+                          'activities': [],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ]);
+
+      Get.put<ClassroomController>(controller);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(home: FacilitatorClassroomScreen()),
+      );
+      await tester.pumpAndSettle();
+
+      final createActivityButton = find.byKey(
+        const Key('facilitator_create_activity_button'),
+      );
+      expect(createActivityButton, findsOneWidget);
+
+      await tester.ensureVisible(createActivityButton);
+      await tester.tap(createActivityButton);
+      await tester.pumpAndSettle();
+
+      final blueprintDropdown = find.byKey(
+        const Key('create_activity_blueprint_track_dropdown'),
+      );
+      expect(
+        blueprintDropdown,
+        findsOneWidget,
+        reason:
+            'Blueprint Track dropdown should be visible in Create Activity sheet',
+      );
+
+      await tester.ensureVisible(blueprintDropdown);
+      await tester.pumpAndSettle();
+
+      await tester.tap(blueprintDropdown);
+      await tester.pumpAndSettle(const Duration(milliseconds: 600));
+
+      final impactUniTextFinder = find.text('ImpactUni (18+)');
+      expect(
+        impactUniTextFinder,
+        findsWidgets,
+        reason: 'Level 4 ImpactUni option should exist in dropdown menu',
+      );
+
+      await tester.tap(impactUniTextFinder.last);
+      await tester.pumpAndSettle(const Duration(milliseconds: 800));
+
+      // After selecting ImpactUni, the autofill should populate the title
+      // with first strand and first term focus
+      final titleTextFinder = find.text(
+        'Personal Finance and Career Capital - Personal and Professional Capital',
+      );
+      expect(
+        titleTextFinder,
+        findsOneWidget,
+        reason:
+            'Title should be autofilled with ImpactUni strand and term after selection',
+      );
+    },
+  );
 }

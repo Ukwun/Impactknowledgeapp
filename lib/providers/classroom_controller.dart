@@ -354,6 +354,16 @@ class ClassroomController extends GetxController {
     return {};
   }
 
+  Map<String, dynamic> get levelFourImpactUniBlueprint {
+    final framework = fourLevelCurriculumFramework;
+    for (final item in framework) {
+      if (item['key']?.toString() == 'impactuni') {
+        return item;
+      }
+    }
+    return {};
+  }
+
   List<Map<String, dynamic>> get cycleOptions {
     final items = <Map<String, dynamic>>[];
     for (final programme in hierarchy) {
