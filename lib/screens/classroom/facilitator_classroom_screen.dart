@@ -15,6 +15,19 @@ class FacilitatorClassroomScreen extends StatefulWidget {
 class _FacilitatorClassroomScreenState
     extends State<FacilitatorClassroomScreen> {
   late ClassroomController classroomController;
+  final TextEditingController _incidentNoteCtrl = TextEditingController();
+  final Set<String> _activeToolIds = <String>{};
+  int _activeSessionStep = 9;
+  int _engagementScore = 72;
+  bool _sessionInProgress = false;
+  bool _attendanceConfirmed = false;
+  String _replayStatus = 'Pending';
+
+  @override
+  void dispose() {
+    _incidentNoteCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -66,6 +79,10 @@ class _FacilitatorClassroomScreenState
         final seniorBlueprint =
             classroomController.levelThreeSeniorSecondaryBlueprint;
         final uniBlueprint = classroomController.levelFourImpactUniBlueprint;
+        final liveRoles = classroomController.liveFacilitatorRoles;
+        final sessionSequence = classroomController.liveSessionSequence;
+        final toolRequirements =
+            classroomController.facilitatorToolRequirements;
 
         return RefreshIndicator(
           color: AppTheme.primary500,
@@ -81,6 +98,98 @@ class _FacilitatorClassroomScreenState
                 const SizedBox(height: 16),
               _buildActionConsole(),
               const SizedBox(height: 16),
+              // ─── LIVE FACILITATOR FRAMEWORK ───────────────────────────
+              _SectionCard(
+                title: 'Live Facilitation Roles',
+                child: liveRoles.isEmpty
+                    ? const Text(
+                        'Facilitator role definitions will appear once the blueprint is loaded.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      )
+                    : Column(
+                        children: liveRoles.map((role) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppTheme.dark600,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.dark500),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.primary500.withValues(
+                                      alpha: 0.15,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.person_outline,
+                                    color: AppTheme.primary400,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        role['role']?.toString() ?? 'Role',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        role['responsibility']?.toString() ??
+                                            '',
+                                        style: const TextStyle(
+                                          color: AppTheme.textMuted,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+              ),
+              const SizedBox(height: 16),
+              _SectionCard(
+                title: 'Live Session Conductor',
+                child: sessionSequence.isEmpty
+                    ? const Text(
+                        'Session sequence will appear once the blueprint is loaded.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      )
+                    : _liveSessionConductor(
+                        sessionSequence: sessionSequence,
+                        activeSessions: sessions,
+                      ),
+              ),
+              const SizedBox(height: 16),
+              _SectionCard(
+                title: 'Facilitator Tool Panel',
+                child: toolRequirements.isEmpty
+                    ? const Text(
+                        'Tool requirements will appear once the blueprint is loaded.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      )
+                    : _facilitatorToolPanel(tools: toolRequirements),
+              ),
+              const SizedBox(height: 16),
+              // ──────────────────────────────────────────────────────────
               _SectionCard(
                 title: 'Delivery Model Readiness',
                 child: Column(
@@ -1076,6 +1185,487 @@ class _FacilitatorClassroomScreenState
           ],
         ],
       ),
+    );
+  }
+
+  String _toolId(Map<String, dynamic> tool) {
+    final raw = tool['tool']?.toString().toLowerCase().trim() ?? 'tool';
+    return raw.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
+  }
+
+  IconData _iconFromBlueprint(String? iconName) {
+    switch (iconName) {
+      case 'how_to_reg':
+        return Icons.how_to_reg_outlined;
+      case 'notes':
+        return Icons.notes_outlined;
+      case 'poll':
+        return Icons.poll_outlined;
+      case 'meeting_room':
+        return Icons.meeting_room_outlined;
+      case 'draw':
+        return Icons.draw_outlined;
+      case 'assignment_late':
+        return Icons.assignment_late_outlined;
+      case 'video_library':
+        return Icons.video_library_outlined;
+      case 'bar_chart':
+        return Icons.bar_chart_outlined;
+      case 'shield':
+        return Icons.shield_outlined;
+      default:
+        return Icons.tune_outlined;
+    }
+  }
+
+  void _activateTool(Map<String, dynamic> tool, {String? message}) {
+    setState(() {
+      _activeToolIds.add(_toolId(tool));
+    });
+    if (message != null && message.trim().isNotEmpty) {
+      Get.snackbar(
+        tool['tool']?.toString() ?? 'Tool Updated',
+        message,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  void _advanceConductor(List<Map<String, dynamic>> sequence) {
+    if (sequence.isEmpty) return;
+
+    final ordered =
+        sequence
+            .map((entry) => int.tryParse(entry['step']?.toString() ?? '') ?? 0)
+            .where((value) => value > 0)
+            .toList()
+          ..sort();
+    if (ordered.isEmpty) return;
+
+    if (!_sessionInProgress) {
+      setState(() {
+        _sessionInProgress = true;
+        _activeSessionStep = ordered.first;
+      });
+      return;
+    }
+
+    final currentIndex = ordered.indexOf(_activeSessionStep);
+    if (currentIndex >= 0 && currentIndex < ordered.length - 1) {
+      setState(() {
+        _activeSessionStep = ordered[currentIndex + 1];
+        _engagementScore = (_engagementScore + 3).clamp(0, 100);
+      });
+      return;
+    }
+
+    setState(() {
+      _attendanceConfirmed = true;
+      _replayStatus = 'Ready for Publishing';
+    });
+    Get.snackbar(
+      'Session Flow Complete',
+      'All live session stages are completed. Publish replay and assignment reminders.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  String _toolActionLabel(String toolName) {
+    final normalized = toolName.toLowerCase();
+    if (normalized.contains('attendance')) return 'Take Attendance';
+    if (normalized.contains('lesson plan')) return 'Open Notes';
+    if (normalized.contains('poll')) return 'Launch Poll';
+    if (normalized.contains('breakout')) return 'Create Breakouts';
+    if (normalized.contains('whiteboard')) return 'Open Whiteboard';
+    if (normalized.contains('assignment')) return 'Send Reminder';
+    if (normalized.contains('replay')) return 'Publish Replay';
+    if (normalized.contains('participation')) return 'Sync Score';
+    if (normalized.contains('safeguarding')) return 'Log Note';
+    return 'Activate';
+  }
+
+  void _triggerToolAction(Map<String, dynamic> tool) {
+    final name = tool['tool']?.toString().toLowerCase() ?? '';
+    if (name.contains('attendance')) {
+      setState(() {
+        _attendanceConfirmed = true;
+      });
+      _activateTool(
+        tool,
+        message:
+            'Attendance tracker synchronized and session attendance confirmed.',
+      );
+      return;
+    }
+    if (name.contains('poll')) {
+      setState(() {
+        _engagementScore = (_engagementScore + 6).clamp(0, 100);
+      });
+      _activateTool(
+        tool,
+        message: 'Live poll launched. Participation score has been updated.',
+      );
+      return;
+    }
+    if (name.contains('replay')) {
+      setState(() {
+        _replayStatus = 'Published';
+      });
+      _activateTool(
+        tool,
+        message: 'Replay has been published to learner and school feeds.',
+      );
+      return;
+    }
+    if (name.contains('participation')) {
+      setState(() {
+        _engagementScore = (_engagementScore + 4).clamp(0, 100);
+      });
+      _activateTool(
+        tool,
+        message: 'Participation indicator has been recalculated.',
+      );
+      return;
+    }
+    if (name.contains('safeguarding')) {
+      final note = _incidentNoteCtrl.text.trim();
+      if (note.isEmpty) {
+        Get.snackbar(
+          'Safeguarding Note Required',
+          'Enter a note before submitting safeguarding information.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+      _incidentNoteCtrl.clear();
+      _activateTool(
+        tool,
+        message:
+            'Safeguarding note saved and escalated to Programme Coordinator.',
+      );
+      return;
+    }
+    _activateTool(
+      tool,
+      message: 'Tool activated for this live classroom session.',
+    );
+  }
+
+  Widget _liveSessionConductor({
+    required List<Map<String, dynamic>> sessionSequence,
+    required List<Map<String, dynamic>> activeSessions,
+  }) {
+    final orderedStages = [...sessionSequence]
+      ..sort((a, b) {
+        final sa = int.tryParse(a['step']?.toString() ?? '') ?? 0;
+        final sb = int.tryParse(b['step']?.toString() ?? '') ?? 0;
+        return sa.compareTo(sb);
+      });
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _BlendPill(
+              label: 'Session',
+              value: _sessionInProgress ? 'In Progress' : 'Not Started',
+              color: AppTheme.info500,
+            ),
+            _BlendPill(
+              label: 'Active Step',
+              value: _activeSessionStep.toString(),
+              color: AppTheme.primary500,
+            ),
+            _BlendPill(
+              label: 'Attendance',
+              value: _attendanceConfirmed ? 'Confirmed' : 'Pending',
+              color: _attendanceConfirmed
+                  ? AppTheme.success500
+                  : AppTheme.warning500,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...orderedStages.map((stage) {
+          final step = int.tryParse(stage['step']?.toString() ?? '') ?? 0;
+          final isActive = _sessionInProgress && step == _activeSessionStep;
+          final isCompleted = _sessionInProgress && step < _activeSessionStep;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isActive
+                  ? AppTheme.primary500.withValues(alpha: 0.14)
+                  : AppTheme.dark600,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isActive
+                    ? AppTheme.primary500
+                    : isCompleted
+                    ? AppTheme.success500.withValues(alpha: 0.5)
+                    : AppTheme.dark500,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? AppTheme.success500.withValues(alpha: 0.2)
+                        : AppTheme.dark700,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    step.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        stage['label']?.toString() ?? 'Session Stage',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        stage['description']?.toString() ?? '',
+                        style: const TextStyle(
+                          color: AppTheme.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton.icon(
+              onPressed: () => _advanceConductor(orderedStages),
+              icon: Icon(
+                _sessionInProgress
+                    ? Icons.playlist_add_check
+                    : Icons.play_arrow,
+              ),
+              label: Text(
+                _sessionInProgress ? 'Continue Session' : 'Start Session',
+              ),
+            ),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _attendanceConfirmed = true;
+                });
+                Get.snackbar(
+                  'Attendance Confirmed',
+                  'Attendance is confirmed and synced for this live session.',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              },
+              icon: const Icon(Icons.how_to_reg_outlined),
+              label: const Text('Confirm Attendance'),
+            ),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() {
+                  _replayStatus = 'Published';
+                });
+                Get.snackbar(
+                  'Replay Published',
+                  'Replay has been published and visible to enrolled learners.',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              },
+              icon: const Icon(Icons.video_library_outlined),
+              label: const Text('Publish Replay'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Active sessions today: ${activeSessions.length} • Replay status: $_replayStatus',
+          style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _facilitatorToolPanel({required List<Map<String, dynamic>> tools}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _BlendPill(
+              label: 'Tools Active',
+              value: '${_activeToolIds.length}/${tools.length}',
+              color: AppTheme.primary500,
+            ),
+            _BlendPill(
+              label: 'Engagement Score',
+              value: '$_engagementScore%',
+              color: AppTheme.success500,
+            ),
+            _BlendPill(
+              label: 'Replay',
+              value: _replayStatus,
+              color: AppTheme.info500,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: (_engagementScore / 100).clamp(0.0, 1.0),
+            minHeight: 8,
+            backgroundColor: AppTheme.dark500,
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              AppTheme.success500,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...tools.map((tool) {
+          final toolName = tool['tool']?.toString() ?? 'Tool';
+          final toolDesc = tool['description']?.toString() ?? '';
+          final toolId = _toolId(tool);
+          final isActive = _activeToolIds.contains(toolId);
+          final isSafeguarding = toolName.toLowerCase().contains(
+            'safeguarding',
+          );
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.dark600,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isActive
+                    ? AppTheme.success500.withValues(alpha: 0.45)
+                    : AppTheme.dark500,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary500.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        _iconFromBlueprint(tool['icon']?.toString()),
+                        color: AppTheme.primary400,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            toolName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            toolDesc,
+                            style: const TextStyle(
+                              color: AppTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? AppTheme.success500.withValues(alpha: 0.18)
+                            : AppTheme.warning500.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isActive ? 'Active' : 'Ready',
+                        style: TextStyle(
+                          color: isActive
+                              ? AppTheme.success500
+                              : AppTheme.warning500,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (isSafeguarding) ...[
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _incidentNoteCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    maxLines: 2,
+                    decoration: AppTheme.darkInput(
+                      hint:
+                          'Incident / safeguarding note (captured with timestamp and escalation route)',
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _triggerToolAction(tool),
+                    icon: const Icon(Icons.play_circle_outline, size: 16),
+                    label: Text(_toolActionLabel(toolName)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
     );
   }
 

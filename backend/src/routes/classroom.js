@@ -117,6 +117,48 @@ const LIVE_FACILITATOR_FRAMEWORK = {
     'Faster concept mastery',
     'Visible learner progression',
   ],
+  roles: [
+    {
+      role: 'Lead Facilitator',
+      responsibility: 'Delivers the lesson, guides discussion, and drives learning outcomes.',
+      icon: 'school',
+    },
+    {
+      role: 'Classroom Moderator',
+      responsibility: 'Manages attendance, chat, questions, breakout groups, and learning flow.',
+      icon: 'manage_accounts',
+    },
+    {
+      role: 'Mentor / Guest Expert',
+      responsibility: 'Provides specialist perspective, especially in Senior Secondary and ImpactUni.',
+      icon: 'person_pin',
+    },
+    {
+      role: 'Programme Coordinator',
+      responsibility: 'Monitors quality, replay publishing, timetable flow, and escalations.',
+      icon: 'dashboard_customize',
+    },
+  ],
+  standardSessionSequence: [
+    { step: 9, label: 'Welcome and Recap', description: 'Open session, greet learners, recap previous lesson key points.' },
+    { step: 10, label: 'Key Concept Teaching', description: 'Deliver the core content for this session clearly and concisely.' },
+    { step: 11, label: 'Scenario, Case, or Activity', description: 'Run a scenario, case study, or hands-on practical activity.' },
+    { step: 12, label: 'Learner Participation and Questions', description: 'Open floor for questions, poll responses, and learner contributions.' },
+    { step: 13, label: 'Reflection and Challenge Prompt', description: 'Guide learners through a brief reflection and issue the week challenge.' },
+    { step: 14, label: 'Assignment Briefing', description: 'Clearly brief the assignment: task, deadline, submission method, and rubric.' },
+    { step: 15, label: 'Attendance Confirmation and Close', description: 'Confirm attendance, share replay link timeline, and close session.' },
+  ],
+  toolRequirements: [
+    { tool: 'Attendance Tracker', description: 'Mark present, late, or absent for each enrolled learner per session.', icon: 'how_to_reg' },
+    { tool: 'Lesson Plan and Facilitator Notes Panel', description: 'In-session view of lesson objectives, script notes, and stage cues.', icon: 'notes' },
+    { tool: 'Live Polls and Quizzes', description: 'Launch quick polls or knowledge checks during the session.', icon: 'poll' },
+    { tool: 'Breakout Room Controls', description: 'Create, assign, and close breakout groups for collaborative tasks.', icon: 'meeting_room' },
+    { tool: 'Whiteboard / Annotation Support', description: 'Annotate, draw, or highlight in real time during lesson delivery.', icon: 'draw' },
+    { tool: 'Assignment Reminder and Follow-up Prompts', description: 'Trigger assignment reminder notifications to learners post-session.', icon: 'assignment_late' },
+    { tool: 'Replay Publishing Workflow', description: 'Mark session as complete, upload or link replay, and publish to learner feeds.', icon: 'video_library' },
+    { tool: 'Participation Score / Engagement Indicator', description: 'Track and display each learner\'s engagement level per session.', icon: 'bar_chart' },
+    { tool: 'Incident / Safeguarding Note Field', description: 'Log any safeguarding concern, incident, or escalation note with timestamp.', icon: 'shield' },
+  ],
 };
 
 const FOUR_LEVEL_CURRICULUM_FRAMEWORK = [
