@@ -285,6 +285,40 @@ class ClassroomController extends GetxController {
         .toList();
   }
 
+  Map<String, dynamic> get liveFacilitatorFramework {
+    final source = blueprint['liveFacilitatorFramework'];
+    if (source is Map<String, dynamic>) return source;
+    if (source is Map) return Map<String, dynamic>.from(source);
+    return {};
+  }
+
+  List<Map<String, dynamic>> get liveFacilitatorRoles {
+    final roles = liveFacilitatorFramework['roles'];
+    if (roles is! List) return [];
+    return roles
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  List<Map<String, dynamic>> get liveSessionSequence {
+    final seq = liveFacilitatorFramework['standardSessionSequence'];
+    if (seq is! List) return [];
+    return seq
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  List<Map<String, dynamic>> get facilitatorToolRequirements {
+    final tools = liveFacilitatorFramework['toolRequirements'];
+    if (tools is! List) return [];
+    return tools
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   List<Map<String, dynamic>> get fourLevelCurriculumFramework {
     final source = blueprint['fourLevelCurriculumFramework'];
     if (source is! List) return [];
