@@ -898,6 +898,84 @@ async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_testimonials_active ON testimonials(is_active);
     `).catch(() => {});
 
+    // Security and compliance tables
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS refresh_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_jti VARCHAR(255) UNIQUE NOT NULL,
+        expires_at TIMESTAMP NOT NULL,
+        revoked_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id, expires_at);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS media_assets (
+        id SERIAL PRIMARY KEY,
+        owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        file_name VARCHAR(255) NOT NULL,
+        mime_type VARCHAR(120) NOT NULL,
+        byte_size BIGINT NOT NULL,
+        storage_path TEXT NOT NULL,
+        access_scope VARCHAR(30) DEFAULT 'private',
+        scan_status VARCHAR(30) DEFAULT 'pending_scan',
+        transcoding_status VARCHAR(30),
+        thumbnail_path TEXT,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_media_assets_owner ON media_assets(owner_id, created_at);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS consent_records (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        consent_type VARCHAR(80) NOT NULL,
+        consent_version VARCHAR(40) NOT NULL,
+        granted BOOLEAN NOT NULL,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_consent_records_user ON consent_records(user_id, consent_type, created_at);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS audit_logs (
+        id SERIAL PRIMARY KEY,
+        actor_id INTEGER REFERENCES users(id),
+        actor_role VARCHAR(50),
+        action VARCHAR(120) NOT NULL,
+        entity_type VARCHAR(80),
+        entity_id VARCHAR(120),
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        metadata JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_id, created_at);
+    `).catch(() => {});
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action, created_at);
+    `).catch(() => {});
+
     console.log('Database tables initialized successfully');
     return pool;
   } catch (err) {

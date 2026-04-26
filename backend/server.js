@@ -14,6 +14,9 @@ const quizRoutes = require('./src/routes/quizzes');
 const assignmentRoutes = require('./src/routes/assignments');
 const eventRoutes = require('./src/routes/events');
 const adminRoutes = require('./src/routes/admin');
+const uploadsRoutes = require('./src/routes/uploads');
+const analyticsEventsRoutes = require('./src/routes/analytics_events');
+const systemRoutes = require('./src/routes/system');
 
 const app = express();
 
@@ -87,6 +90,9 @@ app.use('/api/notifications', require('./src/routes/notifications'));
 app.use('/api/role-resources', require('./src/routes/role_resources'));
 app.use('/api/relationships', require('./src/routes/relationships'));
 app.use('/api/classroom', require('./src/routes/classroom'));
+app.use('/api/uploads', uploadsRoutes);
+app.use('/api/analytics', analyticsEventsRoutes);
+app.use('/api/system', systemRoutes);
 
 // 404 handler
 app.use((req, res) => {

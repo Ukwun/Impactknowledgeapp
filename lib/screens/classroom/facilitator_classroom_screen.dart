@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../config/app_theme.dart';
 import '../../config/routes.dart';
+import '../../config/service_locator.dart';
 import '../../providers/classroom_controller.dart';
+import '../../services/api/api_service.dart';
 
 class FacilitatorClassroomScreen extends StatefulWidget {
   const FacilitatorClassroomScreen({super.key});
@@ -17,6 +20,7 @@ class FacilitatorClassroomScreen extends StatefulWidget {
 class _FacilitatorClassroomScreenState
     extends State<FacilitatorClassroomScreen> {
   late ClassroomController classroomController;
+  final ApiService _apiService = getIt<ApiService>();
   final TextEditingController _incidentNoteCtrl = TextEditingController();
   final Set<String> _activeToolIds = <String>{};
   int _activeSessionStep = 9;
@@ -2148,7 +2152,7 @@ class _FacilitatorClassroomScreenState
         ? strandOptions.first
         : '';
     final mediaPicker = ImagePicker();
-    final selectedUploadedAssets = <Map<String, String>>[];
+    final selectedUploadedAssets = <Map<String, dynamic>>[];
     String selectedAssessmentTrack = 'quiz_short_test';
     String selectedRecognitionTrack = 'skill_badge';
     int completionThresholdPercent = 75;
@@ -2264,22 +2268,93 @@ class _FacilitatorClassroomScreenState
               );
               if (result == null || result.files.isEmpty) return;
               final file = result.files.first;
-              setSheetState(() {
-                selectedUploadedAssets.add({
-                  'type': 'pdf',
-                  'name': file.name,
-                  'source': 'device',
-                });
-                if (downloadableCtrl.text.trim().isEmpty) {
-                  downloadableCtrl.text = file.name;
-                } else {
-                  downloadableCtrl.text =
-                      '${downloadableCtrl.text.trim()}, ${file.name}';
+              final filePath = file.path;
+              if (filePath == null) return;
+
+              try {
+                final bytes = await File(filePath).length();
+                final signResponse = await _apiService.requestSignedUpload(
+                  fileName: file.name,
+                  mimeType: 'application/pdf',
+                  byteSize: bytes,
+                  accessScope: 'private',
+                  purpose: 'classroom_material',
+                );
+
+                final uploadData =
+                    (signResponse['data']?['upload'] ?? {})
+                        as Map<String, dynamic>;
+                final assetId = signResponse['data']?['assetId'];
+                final uploadUrl = uploadData['uploadUrl']?.toString();
+                if (assetId == null || uploadUrl == null || uploadUrl.isEmpty) {
+                  throw Exception('Upload initialization failed');
                 }
-                resourceCtrl.text = resourceCtrl.text.trim().isEmpty
-                    ? 'local://${file.name}'
-                    : resourceCtrl.text;
-              });
+
+                final cloudResponse = await _apiService
+                    .uploadToSignedCloudinary(
+                      uploadUrl: uploadUrl,
+                      filePath: filePath,
+                      fields: {
+                        'api_key': uploadData['apiKey'],
+                        'timestamp': uploadData['timestamp'],
+                        'folder': uploadData['folder'],
+                        'public_id': uploadData['publicId'],
+                        'signature': uploadData['signature'],
+                      },
+                    );
+
+                final complete = await _apiService.completeSignedUpload(
+                  assetId: assetId is int
+                      ? assetId
+                      : int.parse(assetId.toString()),
+                  secureUrl: cloudResponse['secure_url']?.toString() ?? '',
+                  uploadedBytes: bytes,
+                  format: cloudResponse['format']?.toString(),
+                );
+
+                final secureUrl =
+                    complete['data']?['metadata']?['secureUrl']?.toString() ??
+                    cloudResponse['secure_url']?.toString() ??
+                    '';
+
+                setSheetState(() {
+                  selectedUploadedAssets.add({
+                    'type': 'pdf',
+                    'name': file.name,
+                    'source': 'cloudinary',
+                    'assetId': assetId,
+                    'url': secureUrl,
+                  });
+                  if (downloadableCtrl.text.trim().isEmpty) {
+                    downloadableCtrl.text = file.name;
+                  } else {
+                    downloadableCtrl.text =
+                        '${downloadableCtrl.text.trim()}, ${file.name}';
+                  }
+                  if (resourceCtrl.text.trim().isEmpty &&
+                      secureUrl.isNotEmpty) {
+                    resourceCtrl.text = secureUrl;
+                  }
+                });
+
+                await _apiService.trackAnalyticsEvent(
+                  eventName: 'assignment_submitted',
+                  resourceType: 'media_asset',
+                  resourceId: assetId is int
+                      ? assetId
+                      : int.tryParse(assetId.toString()),
+                  metadata: {
+                    'assetType': 'pdf',
+                    'context': 'facilitator_create_activity',
+                  },
+                );
+              } catch (error) {
+                Get.snackbar(
+                  'Upload Failed',
+                  'PDF upload could not be completed. $error',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              }
             }
 
             Future<void> pickImageAsset() async {
@@ -2288,16 +2363,99 @@ class _FacilitatorClassroomScreenState
                 imageQuality: 80,
               );
               if (file == null) return;
-              setSheetState(() {
-                selectedUploadedAssets.add({
-                  'type': 'image',
-                  'name': file.name,
-                  'source': 'gallery',
+
+              final extension = file.name.toLowerCase().endsWith('.png')
+                  ? 'image/png'
+                  : file.name.toLowerCase().endsWith('.webp')
+                  ? 'image/webp'
+                  : 'image/jpeg';
+
+              try {
+                final bytes = await File(file.path).length();
+                final signResponse = await _apiService.requestSignedUpload(
+                  fileName: file.name,
+                  mimeType: extension,
+                  byteSize: bytes,
+                  accessScope: 'private',
+                  purpose: 'classroom_material',
+                );
+
+                final uploadData =
+                    (signResponse['data']?['upload'] ?? {})
+                        as Map<String, dynamic>;
+                final assetId = signResponse['data']?['assetId'];
+                final uploadUrl = uploadData['uploadUrl']?.toString();
+                if (assetId == null || uploadUrl == null || uploadUrl.isEmpty) {
+                  throw Exception('Upload initialization failed');
+                }
+
+                final cloudResponse = await _apiService
+                    .uploadToSignedCloudinary(
+                      uploadUrl: uploadUrl,
+                      filePath: file.path,
+                      fields: {
+                        'api_key': uploadData['apiKey'],
+                        'timestamp': uploadData['timestamp'],
+                        'folder': uploadData['folder'],
+                        'public_id': uploadData['publicId'],
+                        'signature': uploadData['signature'],
+                      },
+                    );
+
+                final complete = await _apiService.completeSignedUpload(
+                  assetId: assetId is int
+                      ? assetId
+                      : int.parse(assetId.toString()),
+                  secureUrl: cloudResponse['secure_url']?.toString() ?? '',
+                  uploadedBytes: bytes,
+                  format: cloudResponse['format']?.toString(),
+                  width: cloudResponse['width'] is int
+                      ? cloudResponse['width']
+                      : int.tryParse((cloudResponse['width'] ?? '').toString()),
+                  height: cloudResponse['height'] is int
+                      ? cloudResponse['height']
+                      : int.tryParse(
+                          (cloudResponse['height'] ?? '').toString(),
+                        ),
+                );
+
+                final secureUrl =
+                    complete['data']?['metadata']?['secureUrl']?.toString() ??
+                    cloudResponse['secure_url']?.toString() ??
+                    '';
+
+                setSheetState(() {
+                  selectedUploadedAssets.add({
+                    'type': 'image',
+                    'name': file.name,
+                    'source': 'cloudinary',
+                    'assetId': assetId,
+                    'url': secureUrl,
+                  });
+                  if (resourceCtrl.text.trim().isEmpty &&
+                      secureUrl.isNotEmpty) {
+                    resourceCtrl.text = secureUrl;
+                  }
                 });
-                resourceCtrl.text = resourceCtrl.text.trim().isEmpty
-                    ? file.path
-                    : resourceCtrl.text;
-              });
+
+                await _apiService.trackAnalyticsEvent(
+                  eventName: 'assignment_submitted',
+                  resourceType: 'media_asset',
+                  resourceId: assetId is int
+                      ? assetId
+                      : int.tryParse(assetId.toString()),
+                  metadata: {
+                    'assetType': 'image',
+                    'context': 'facilitator_create_activity',
+                  },
+                );
+              } catch (error) {
+                Get.snackbar(
+                  'Upload Failed',
+                  'Image upload could not be completed. $error',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              }
             }
 
             Future<void> pickVideoAsset() async {
@@ -2306,16 +2464,105 @@ class _FacilitatorClassroomScreenState
                 maxDuration: const Duration(minutes: 20),
               );
               if (file == null) return;
-              setSheetState(() {
-                selectedUploadedAssets.add({
-                  'type': 'video',
-                  'name': file.name,
-                  'source': 'gallery',
+
+              final lowerName = file.name.toLowerCase();
+              final mimeType = lowerName.endsWith('.mov')
+                  ? 'video/quicktime'
+                  : lowerName.endsWith('.mkv')
+                  ? 'video/x-matroska'
+                  : 'video/mp4';
+
+              try {
+                final bytes = await File(file.path).length();
+                final signResponse = await _apiService.requestSignedUpload(
+                  fileName: file.name,
+                  mimeType: mimeType,
+                  byteSize: bytes,
+                  accessScope: 'private',
+                  purpose: 'classroom_recording',
+                );
+
+                final uploadData =
+                    (signResponse['data']?['upload'] ?? {})
+                        as Map<String, dynamic>;
+                final assetId = signResponse['data']?['assetId'];
+                final uploadUrl = uploadData['uploadUrl']?.toString();
+                if (assetId == null || uploadUrl == null || uploadUrl.isEmpty) {
+                  throw Exception('Upload initialization failed');
+                }
+
+                final cloudResponse = await _apiService
+                    .uploadToSignedCloudinary(
+                      uploadUrl: uploadUrl,
+                      filePath: file.path,
+                      fields: {
+                        'api_key': uploadData['apiKey'],
+                        'timestamp': uploadData['timestamp'],
+                        'folder': uploadData['folder'],
+                        'public_id': uploadData['publicId'],
+                        'signature': uploadData['signature'],
+                      },
+                    );
+
+                final complete = await _apiService.completeSignedUpload(
+                  assetId: assetId is int
+                      ? assetId
+                      : int.parse(assetId.toString()),
+                  secureUrl: cloudResponse['secure_url']?.toString() ?? '',
+                  uploadedBytes: bytes,
+                  format: cloudResponse['format']?.toString(),
+                  duration: cloudResponse['duration'] is num
+                      ? cloudResponse['duration']
+                      : num.tryParse(
+                          (cloudResponse['duration'] ?? '').toString(),
+                        ),
+                  width: cloudResponse['width'] is int
+                      ? cloudResponse['width']
+                      : int.tryParse((cloudResponse['width'] ?? '').toString()),
+                  height: cloudResponse['height'] is int
+                      ? cloudResponse['height']
+                      : int.tryParse(
+                          (cloudResponse['height'] ?? '').toString(),
+                        ),
+                );
+
+                final secureUrl =
+                    complete['data']?['metadata']?['secureUrl']?.toString() ??
+                    cloudResponse['secure_url']?.toString() ??
+                    '';
+
+                setSheetState(() {
+                  selectedUploadedAssets.add({
+                    'type': 'video',
+                    'name': file.name,
+                    'source': 'cloudinary',
+                    'assetId': assetId,
+                    'url': secureUrl,
+                  });
+                  if (resourceCtrl.text.trim().isEmpty &&
+                      secureUrl.isNotEmpty) {
+                    resourceCtrl.text = secureUrl;
+                  }
                 });
-                resourceCtrl.text = resourceCtrl.text.trim().isEmpty
-                    ? file.path
-                    : resourceCtrl.text;
-              });
+
+                await _apiService.trackAnalyticsEvent(
+                  eventName: 'assignment_submitted',
+                  resourceType: 'media_asset',
+                  resourceId: assetId is int
+                      ? assetId
+                      : int.tryParse(assetId.toString()),
+                  metadata: {
+                    'assetType': 'video',
+                    'context': 'facilitator_create_activity',
+                  },
+                );
+              } catch (error) {
+                Get.snackbar(
+                  'Upload Failed',
+                  'Video upload could not be completed. $error',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              }
             }
 
             return Padding(
@@ -2915,6 +3162,15 @@ class _FacilitatorClassroomScreenState
                               );
 
                           if (success) {
+                            await _apiService.trackAnalyticsEvent(
+                              eventName: 'quiz_submitted',
+                              resourceType: 'classroom_activity',
+                              metadata: {
+                                'activityType': activityType,
+                                'learningLayer': selectedLayer,
+                                'assessmentTrack': selectedAssessmentTrack,
+                              },
+                            );
                             Get.back();
                           }
                         },

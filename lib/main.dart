@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:logger/logger.dart';
 import 'firebase_options.dart';
 import 'config/app_config.dart';
 import 'config/app_bindings.dart';
@@ -12,22 +13,37 @@ import 'config/app_theme.dart';
 import 'config/routes.dart';
 import 'config/service_locator.dart';
 import 'services/notification_service.dart';
+import 'services/startup_diagnostics.dart';
+
+final Logger _logger = Logger();
 
 // Background message handler
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('🔄 Handling background message: ${message.messageId}');
+  _logger.i('Handling background message: ${message.messageId}');
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  final startupReport = StartupDiagnostics.validateRoleFlows(AppPages.pages);
+  if (!startupReport.isValid) {
+    _logger.w(
+      'Startup diagnostics detected missing role routes: ${startupReport.missingRoutes.join(', ')}',
+    );
+  }
+
   // Initialize Firebase first
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    print('✅ Firebase initialized successfully');
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      _logger.i('Firebase initialized successfully');
+    } else {
+      Firebase.app();
+      _logger.i('Firebase already initialized, reusing default app');
+    }
 
     // Setup Firebase Messaging background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -40,28 +56,33 @@ void main() async {
     // Pass all uncaught async errors that aren't already handled by Flutter to Crashlytics
     PlatformDispatcher.instance.onError = (error, stack) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      _logger.e(
+        'Uncaught async error during runtime',
+        error: error,
+        stackTrace: stack,
+      );
       return true;
     };
 
-    print('✅ Firebase Crashlytics initialized successfully');
+    _logger.i('Firebase Crashlytics initialized successfully');
 
     // Initialize Firebase Analytics
     FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
-    print('✅ Firebase Analytics initialized successfully');
-  } catch (e) {
-    print('❌ Firebase initialization error: $e');
+    _logger.i('Firebase Analytics initialized successfully');
+  } catch (e, stack) {
+    _logger.e('Firebase initialization error', error: e, stackTrace: stack);
   }
 
   try {
     setupServiceLocator();
-    print('✅ Service locator initialized successfully');
+    _logger.i('Service locator initialized successfully');
 
     // Initialize Notification Service
     final notificationService = NotificationService();
     await notificationService.initialize();
-    print('✅ Notification service initialized successfully');
-  } catch (e) {
-    print('❌ Service initialization error: $e');
+    _logger.i('Notification service initialized successfully');
+  } catch (e, stack) {
+    _logger.e('Service initialization error', error: e, stackTrace: stack);
     rethrow;
   }
 

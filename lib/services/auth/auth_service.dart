@@ -1,6 +1,7 @@
 import '../api/api_service.dart';
 import '../../models/auth/user_model.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -15,7 +16,7 @@ class AuthService {
   // Login - using direct HTTP instead of Dio (replaces problematic _postAuth)
   Future<AuthResponse> login(String email, String password) async {
     try {
-      print('LOGIN: Starting login for $email');
+      debugPrint('LOGIN: Starting login for $email');
 
       // Direct HTTP POST to backend - NO Dio complications
       final response = await http.post(
@@ -24,8 +25,8 @@ class AuthService {
         body: jsonEncode({'email': email, 'password': password}),
       );
 
-      print('LOGIN: Response status ${response.statusCode}');
-      print('LOGIN: Response body ${response.body}');
+      debugPrint('LOGIN: Response status ${response.statusCode}');
+      debugPrint('LOGIN: Response body ${response.body}');
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception(
@@ -39,7 +40,7 @@ class AuthService {
       final authResponse = _parseAuthResponse(json);
 
       // Save tokens
-      print(
+      debugPrint(
         '💾 AUTH: Saving token: ${authResponse.accessToken.substring(0, 50)}...',
       );
       await apiService.saveToken(authResponse.accessToken);
@@ -51,10 +52,10 @@ class AuthService {
       }
       await saveUser(authResponse.user);
 
-      print('LOGIN: Success for $email');
+      debugPrint('LOGIN: Success for $email');
       return authResponse;
     } catch (e) {
-      print('LOGIN ERROR: $e');
+      debugPrint('LOGIN ERROR: $e');
       rethrow;
     }
   }
@@ -69,6 +70,9 @@ class AuthService {
         'full_name': '${request.firstName} ${request.lastName}'.trim(),
         'role': request.role ?? 'student',
         'confirmPassword': request.password,
+        'termsAccepted': true,
+        'privacyAccepted': true,
+        'consentVersion': '2026-04-26',
       };
 
       // Direct HTTP POST to backend - NO Dio complications
@@ -83,20 +87,20 @@ class AuthService {
       }
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      print('SIGNUP RESPONSE: $json');
-      print('USER OBJECT: ${json['user']}');
+      debugPrint('SIGNUP RESPONSE: $json');
+      debugPrint('USER OBJECT: ${json['user']}');
 
       AuthResponse authResponse;
       try {
         authResponse = _parseAuthResponse(json);
       } catch (e) {
-        print('PARSE ERROR: $e');
-        print('ATTEMPTING TO PARSE USER: ${json['user']}');
-        print('USER TYPE: ${json['user'].runtimeType}');
+        debugPrint('PARSE ERROR: $e');
+        debugPrint('ATTEMPTING TO PARSE USER: ${json['user']}');
+        debugPrint('USER TYPE: ${json['user'].runtimeType}');
         if (json['user'] is Map) {
           final userMap = json['user'] as Map;
           for (var entry in userMap.entries) {
-            print(
+            debugPrint(
               'Field ${entry.key}: ${entry.value} (${entry.value.runtimeType})',
             );
           }
@@ -115,7 +119,7 @@ class AuthService {
 
       return authResponse;
     } catch (e) {
-      print('SIGNUP ERROR: $e');
+      debugPrint('SIGNUP ERROR: $e');
       rethrow;
     }
   }

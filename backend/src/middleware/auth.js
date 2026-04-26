@@ -3,28 +3,30 @@ const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-local-testing-impactknowledge';
 
 const verifyToken = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.split(' ')[1];
+  const authHeader = req.headers.authorization || '';
+  const [scheme, token] = authHeader.split(' ');
 
-  if (!token) {
-    console.warn('⚠️  NO TOKEN provided. Headers:', req.headers);
+  if (scheme !== 'Bearer' || !token) {
     return res.status(401).json({ error: 'No token provided' });
   }
 
   try {
-    console.log('🔑 TOKEN to verify:', token.substring(0, 50) + '...');
-    console.log('🔑 JWT_SECRET being used:', JWT_SECRET.substring(0, 30) + '...');
-    
     const decoded = jwt.verify(token, JWT_SECRET);
-    console.log('✅ Token verified successfully:', decoded);
+    if (decoded?.type && decoded.type !== 'access') {
+      return res.status(403).json({ error: 'Invalid token type' });
+    }
     req.user = decoded;
     next();
   } catch (err) {
-    console.error('❌ Token verification failed:', err.message);
-    console.error('   Error type:', err.name);
-    console.error('   Token:', token.substring(0, 50) + '...');
-    return res.status(403).json({ error: 'Invalid token', details: err.message });
+    return res.status(403).json({ error: 'Invalid token' });
   }
 };
 
-module.exports = { verifyToken };
+const requireRoles = (...roles) => (req, res, next) => {
+  if (!req.user?.role || !roles.includes(req.user.role)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  return next();
+};
+
+module.exports = { verifyToken, requireRoles };

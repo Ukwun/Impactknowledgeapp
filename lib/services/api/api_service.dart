@@ -193,6 +193,80 @@ class ApiService {
     }
   }
 
+  Future<dynamic> requestSignedUpload({
+    required String fileName,
+    required String mimeType,
+    required int byteSize,
+    String accessScope = 'private',
+    String purpose = 'course_asset',
+  }) async {
+    return await post(
+      'uploads/sign',
+      data: {
+        'fileName': fileName,
+        'mimeType': mimeType,
+        'byteSize': byteSize,
+        'accessScope': accessScope,
+        'purpose': purpose,
+      },
+    );
+  }
+
+  Future<dynamic> uploadToSignedCloudinary({
+    required String uploadUrl,
+    required String filePath,
+    required Map<String, dynamic> fields,
+  }) async {
+    final formData = FormData.fromMap({
+      ...fields,
+      'file': await MultipartFile.fromFile(filePath),
+    });
+    final response = await _dio.post(uploadUrl, data: formData);
+    return response.data;
+  }
+
+  Future<dynamic> completeSignedUpload({
+    required int assetId,
+    required String secureUrl,
+    int? uploadedBytes,
+    String? format,
+    num? duration,
+    int? width,
+    int? height,
+    String virusScanStatus = 'clean',
+  }) async {
+    final payload = <String, dynamic>{
+      'assetId': assetId,
+      'secureUrl': secureUrl,
+      'virusScanStatus': virusScanStatus,
+    };
+    if (uploadedBytes != null) payload['uploadedBytes'] = uploadedBytes;
+    if (format != null) payload['format'] = format;
+    if (duration != null) payload['duration'] = duration;
+    if (width != null) payload['width'] = width;
+    if (height != null) payload['height'] = height;
+
+    return await post('uploads/complete', data: payload);
+  }
+
+  Future<dynamic> trackAnalyticsEvent({
+    required String eventName,
+    String? resourceType,
+    int? resourceId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final payload = <String, dynamic>{'eventName': eventName};
+    if (resourceType != null) payload['resourceType'] = resourceType;
+    if (resourceId != null) payload['resourceId'] = resourceId;
+    if (metadata != null) payload['metadata'] = metadata;
+
+    return await post('analytics/events', data: payload);
+  }
+
+  Future<dynamic> getAnalyticsRecommendations() async {
+    return await get('analytics/recommendations/me');
+  }
+
   // ==================== QUIZ ENDPOINTS ====================
   Future<dynamic> getQuizzes(String courseId) async {
     try {
@@ -538,16 +612,15 @@ class ApiService {
     String? status,
     String? search,
   }) async {
-    return await get(
-      'admin/users',
-      queryParameters: {
-        'page': page,
-        'limit': limit,
-        if (role != null) 'role': role,
-        if (status != null) 'status': status,
-        'search': (search != null && search.isNotEmpty) ? search : null,
-      },
-    );
+    final queryParams = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+      'search': (search != null && search.isNotEmpty) ? search : null,
+    };
+    if (role != null) queryParams['role'] = role;
+    if (status != null) queryParams['status'] = status;
+
+    return await get('admin/users', queryParameters: queryParams);
   }
 
   Future<Map<String, dynamic>> changeUserRole(
@@ -940,13 +1013,12 @@ class ApiService {
     String? reason,
   }) async {
     try {
-      final response = await post(
-        'payments/$reference/refund',
-        data: {
-          if (amount != null) 'amount': amount,
-          'reason': (reason != null && reason.isNotEmpty) ? reason : null,
-        },
-      );
+      final payload = <String, dynamic>{
+        'reason': (reason != null && reason.isNotEmpty) ? reason : null,
+      };
+      if (amount != null) payload['amount'] = amount;
+
+      final response = await post('payments/$reference/refund', data: payload);
       if (response is Map<String, dynamic>) return response;
       return {'success': false};
     } catch (e) {

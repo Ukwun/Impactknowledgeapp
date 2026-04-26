@@ -52,4 +52,48 @@ router.get('/landing-content', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/public/legal/privacy-policy
+ * Public privacy policy endpoint for mobile app and store compliance.
+ */
+router.get('/legal/privacy-policy', async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      version: '2026-04-26',
+      title: 'ImpactKnowledge Privacy Policy',
+      summary:
+        'We collect account, learning activity, and device notification data to deliver personalized learning, progress tracking, and classroom operations.',
+      keyPoints: [
+        'Learner activity data is used for progression, recommendations, and retention interventions.',
+        'Parent and school-linked access is role-scoped and permission-gated.',
+        'Safety and moderation logs are retained for safeguarding and compliance.',
+        'Users can request data export and deletion through support channels.',
+      ],
+    },
+  });
+});
+
+/**
+ * GET /api/public/legal/terms
+ * Public terms endpoint for mobile app and store compliance.
+ */
+router.get('/legal/terms', async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      version: '2026-04-26',
+      title: 'ImpactKnowledge Terms of Service',
+      summary:
+        'Use of the platform requires adherence to learning conduct, payment terms, and child-safety policies.',
+      keyPoints: [
+        'Accounts are role-based and access is restricted by assigned permissions.',
+        'Course progress, attendance, and assessment integrity are monitored.',
+        'Abuse, harassment, and policy violations trigger moderation actions.',
+        'Payments, refunds, and subscriptions follow posted billing terms.',
+      ],
+    },
+  });
+});
+
 module.exports = router;

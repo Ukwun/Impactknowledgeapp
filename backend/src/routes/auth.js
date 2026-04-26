@@ -1,9 +1,11 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
 const ActivityService = require('../services/activity-service');
+const AuditService = require('../services/audit-service');
 
 const router = express.Router();
 
@@ -11,36 +13,69 @@ const JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key-for-local-test
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-jwt-refresh-secret-for-testing';
 const TOKEN_EXPIRY = '24h';
 const REFRESH_TOKEN_EXPIRY = '7d';
+const isDev = process.env.NODE_ENV !== 'production';
+
+function devLog(...args) {
+  if (isDev) {
+    console.log(...args);
+  }
+}
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
 
-console.log('✅ AUTH USING REAL DATABASE WITH POSTGRESQL');
+devLog('AUTH route initialized with PostgreSQL backend');
 
 // Helper function to generate tokens
-function generateTokens(userId, userRole) {
+function generateTokens(userId, userRole, refreshJti = uuidv4()) {
   const accessToken = jwt.sign(
-    { id: userId, role: userRole },
+    { id: userId, role: userRole, type: 'access' },
     JWT_SECRET,
     { expiresIn: TOKEN_EXPIRY }
   );
 
   const refreshToken = jwt.sign(
-    { id: userId },
+    { id: userId, role: userRole, type: 'refresh', jti: refreshJti },
     JWT_REFRESH_SECRET,
     { expiresIn: REFRESH_TOKEN_EXPIRY }
   );
 
-  return { accessToken, refreshToken };
+  return { accessToken, refreshToken, refreshJti };
+}
+
+async function storeRefreshToken(userId, tokenJti, expiresAtIso) {
+  await query(
+    `INSERT INTO refresh_tokens (user_id, token_jti, expires_at)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (token_jti) DO NOTHING`,
+    [userId, tokenJti, expiresAtIso]
+  );
+}
+
+async function revokeRefreshToken(tokenJti) {
+  await query(
+    `UPDATE refresh_tokens
+     SET revoked_at = NOW(), updated_at = NOW()
+     WHERE token_jti = $1 AND revoked_at IS NULL`,
+    [tokenJti]
+  );
 }
 
 // Register endpoint
 router.post('/register', async (req, res) => {
-  console.log('=== REGISTER ===', { email: req.body.email, name: req.body.full_name });
+  devLog('REGISTER attempt', { email: req.body.email, name: req.body.full_name });
   
   try {
-    const { email, password, full_name, role = 'student' } = req.body;
+    const {
+      email,
+      password,
+      full_name,
+      role = 'student',
+      termsAccepted = false,
+      privacyAccepted = false,
+      consentVersion = '2026-04-26',
+    } = req.body;
     const normalizedEmail = normalizeEmail(email);
     const normalizedName = String(full_name || '').trim();
 
@@ -92,10 +127,45 @@ router.post('/register', async (req, res) => {
     // Log registration activity
     await ActivityService.logActivity(user.id, 'REGISTER', 'user', user.id, { role }, req);
 
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
+    if (termsAccepted || privacyAccepted) {
+      const consentRows = [];
+      if (termsAccepted) {
+        consentRows.push(['terms_of_service', consentVersion]);
+      }
+      if (privacyAccepted) {
+        consentRows.push(['privacy_policy', consentVersion]);
+      }
 
-    console.log('✅ REGISTER SUCCESS: New user created with ID:', user.id, 'Email:', email);
+      for (const [consentType, version] of consentRows) {
+        await query(
+          `INSERT INTO consent_records (user_id, consent_type, consent_version, metadata)
+           VALUES ($1, $2, $3, $4::jsonb)`,
+          [
+            user.id,
+            consentType,
+            String(version),
+            JSON.stringify({ source: 'register', accepted: true }),
+          ]
+        );
+      }
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken, refreshJti } = generateTokens(user.id, user.role);
+    const decodedRefresh = jwt.decode(refreshToken);
+    await storeRefreshToken(user.id, refreshJti, new Date(decodedRefresh.exp * 1000).toISOString());
+
+    await AuditService.log({
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'REGISTER_SUCCESS',
+      entityType: 'user',
+      entityId: String(user.id),
+      metadata: { email: normalizedEmail },
+      req,
+    });
+
+    devLog('REGISTER success', { userId: user.id, email: normalizedEmail });
 
     res.status(201).json({
       success: true,
@@ -113,7 +183,7 @@ router.post('/register', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ Register error:', err);
+    console.error('Register error:', err);
     res.status(500).json({ 
       success: false,
       error: 'Registration failed. Please try again.' 
@@ -123,7 +193,7 @@ router.post('/register', async (req, res) => {
 
 // Login endpoint
 router.post('/login', async (req, res) => {
-  console.log('=== LOGIN ===', { email: req.body.email });
+  devLog('LOGIN attempt', { email: req.body.email });
   
   try {
     const { email, password } = req.body;
@@ -166,9 +236,21 @@ router.post('/login', async (req, res) => {
     await ActivityService.logActivity(user.id, 'LOGIN', 'user', user.id, {}, req);
 
     // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user.id, user.role);
+    const { accessToken, refreshToken, refreshJti } = generateTokens(user.id, user.role);
+    const decodedRefresh = jwt.decode(refreshToken);
+    await storeRefreshToken(user.id, refreshJti, new Date(decodedRefresh.exp * 1000).toISOString());
 
-    console.log('✅ LOGIN SUCCESS: User authenticated:', user.id);
+    await AuditService.log({
+      actorId: user.id,
+      actorRole: user.role,
+      action: 'LOGIN_SUCCESS',
+      entityType: 'user',
+      entityId: String(user.id),
+      metadata: { email: normalizedEmail },
+      req,
+    });
+
+    devLog('LOGIN success', { userId: user.id });
 
     res.json({
       success: true,
@@ -184,7 +266,7 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('❌ Login error:', err);
+    console.error('Login error:', err);
     res.status(500).json({ 
       success: false,
       error: 'Login failed. Please try again.' 
@@ -278,8 +360,24 @@ router.put('/me', verifyToken, async (req, res) => {
 // Logout endpoint
 router.post('/logout', verifyToken, async (req, res) => {
   try {
+    await query(
+      `UPDATE refresh_tokens
+       SET revoked_at = NOW(), updated_at = NOW()
+       WHERE user_id = $1 AND revoked_at IS NULL`,
+      [req.user.id]
+    );
+
     // Log logout activity
     await ActivityService.logActivity(req.user.id, 'LOGOUT', 'user', req.user.id, {}, req);
+    await AuditService.log({
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      action: 'LOGOUT',
+      entityType: 'refresh_token',
+      entityId: String(req.user.id),
+      metadata: { strategy: 'revoke_all_active' },
+      req,
+    });
 
     res.json({ 
       success: true,
@@ -308,7 +406,54 @@ router.post('/refresh', async (req, res) => {
 
     try {
       const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
-      const { accessToken, refreshToken: newRefreshToken } = generateTokens(decoded.id, decoded.role);
+
+      if (decoded.type !== 'refresh' || !decoded.jti) {
+        return res.status(403).json({ success: false, error: 'Invalid refresh token payload' });
+      }
+
+      const refreshTokenResult = await query(
+        `SELECT user_id, expires_at, revoked_at
+         FROM refresh_tokens
+         WHERE token_jti = $1
+         LIMIT 1`,
+        [decoded.jti]
+      );
+
+      if (!refreshTokenResult.rows.length) {
+        return res.status(403).json({ success: false, error: 'Refresh token not recognized' });
+      }
+
+      const tokenRow = refreshTokenResult.rows[0];
+      if (tokenRow.revoked_at) {
+        return res.status(403).json({ success: false, error: 'Refresh token revoked' });
+      }
+      if (new Date(tokenRow.expires_at).getTime() < Date.now()) {
+        return res.status(403).json({ success: false, error: 'Refresh token expired' });
+      }
+
+      const userResult = await query('SELECT id, role FROM users WHERE id = $1 LIMIT 1', [decoded.id]);
+      if (!userResult.rows.length) {
+        return res.status(404).json({ success: false, error: 'User not found for token' });
+      }
+
+      const user = userResult.rows[0];
+      const { accessToken, refreshToken: newRefreshToken, refreshJti } = generateTokens(
+        user.id,
+        user.role
+      );
+
+      const decodedNewRefresh = jwt.decode(newRefreshToken);
+      await storeRefreshToken(user.id, refreshJti, new Date(decodedNewRefresh.exp * 1000).toISOString());
+      await revokeRefreshToken(decoded.jti);
+
+      await AuditService.log({
+        actorId: user.id,
+        actorRole: user.role,
+        action: 'TOKEN_REFRESH_ROTATED',
+        entityType: 'refresh_token',
+        entityId: decoded.jti,
+        metadata: { replacementJti: refreshJti },
+      });
 
       res.json({
         success: true,
@@ -318,14 +463,14 @@ router.post('/refresh', async (req, res) => {
         }
       });
     } catch (err) {
-      console.error('❌ Token verification failed:', err.message);
+      console.error('Token verification failed:', err.message);
       res.status(403).json({ 
         success: false,
         error: 'Invalid refresh token' 
       });
     }
   } catch (err) {
-    console.error('❌ Refresh token error:', err);
+    console.error('Refresh token error:', err);
     res.status(500).json({ 
       success: false,
       error: 'Token refresh failed' 
@@ -386,8 +531,24 @@ router.post('/change-password', verifyToken, async (req, res) => {
       [userId, newPasswordHash]
     );
 
+    await query(
+      `UPDATE refresh_tokens
+       SET revoked_at = NOW(), updated_at = NOW()
+       WHERE user_id = $1 AND revoked_at IS NULL`,
+      [userId]
+    );
+
     // Log activity
     await ActivityService.logActivity(userId, 'CHANGE_PASSWORD', 'user', userId, {}, req);
+    await AuditService.log({
+      actorId: userId,
+      actorRole: req.user.role,
+      action: 'PASSWORD_CHANGED_REFRESH_REVOKED',
+      entityType: 'refresh_token',
+      entityId: String(userId),
+      metadata: { strategy: 'revoke_all_active' },
+      req,
+    });
 
     res.json({
       success: true,
@@ -399,6 +560,45 @@ router.post('/change-password', verifyToken, async (req, res) => {
       success: false,
       error: 'Failed to change password' 
     });
+  }
+});
+
+router.post('/consent', verifyToken, async (req, res) => {
+  try {
+    const { consentType, consentVersion, accepted = true, metadata = {} } = req.body || {};
+
+    if (!consentType || !consentVersion) {
+      return res.status(400).json({
+        success: false,
+        error: 'consentType and consentVersion are required',
+      });
+    }
+
+    await query(
+      `INSERT INTO consent_records (user_id, consent_type, consent_version, metadata)
+       VALUES ($1, $2, $3, $4::jsonb)`,
+      [
+        req.user.id,
+        String(consentType),
+        String(consentVersion),
+        JSON.stringify({ ...metadata, accepted: Boolean(accepted), source: 'explicit' }),
+      ]
+    );
+
+    await AuditService.log({
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      action: 'CONSENT_RECORDED',
+      entityType: 'consent_record',
+      entityId: String(req.user.id),
+      metadata: { consentType, consentVersion, accepted: Boolean(accepted) },
+      req,
+    });
+
+    return res.status(201).json({ success: true });
+  } catch (err) {
+    console.error('Consent record error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to record consent' });
   }
 });
 
