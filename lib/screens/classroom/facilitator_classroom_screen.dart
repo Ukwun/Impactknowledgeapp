@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../config/app_theme.dart';
 import '../../config/routes.dart';
 import '../../providers/classroom_controller.dart';
@@ -21,6 +23,9 @@ class _FacilitatorClassroomScreenState
   int _engagementScore = 72;
   bool _sessionInProgress = false;
   bool _attendanceConfirmed = false;
+  bool _lowBandwidthMode = true;
+  bool _parentAccessEnabled = true;
+  bool _moderationControlsEnabled = true;
   String _replayStatus = 'Pending';
 
   @override
@@ -83,6 +88,13 @@ class _FacilitatorClassroomScreenState
         final sessionSequence = classroomController.liveSessionSequence;
         final toolRequirements =
             classroomController.facilitatorToolRequirements;
+        final assessmentSignals = classroomController.assessmentSignals;
+        final progressionRules = classroomController.progressionRules;
+        final recognitionSystem = classroomController.recognitionSystem;
+        final essentialRequirements =
+            classroomController.essentialProductRequirements;
+        final nextDevelopmentDocs =
+            classroomController.recommendedNextDevelopmentDocuments;
 
         return RefreshIndicator(
           color: AppTheme.primary500,
@@ -187,6 +199,195 @@ class _FacilitatorClassroomScreenState
                         style: TextStyle(color: AppTheme.textMuted),
                       )
                     : _facilitatorToolPanel(tools: toolRequirements),
+              ),
+              const SizedBox(height: 16),
+              _SectionCard(
+                title: 'Assessment, Progression, and Recognition',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (assessmentSignals.isNotEmpty)
+                      _chipList(
+                        title: 'Assessment Signals',
+                        values: assessmentSignals,
+                        color: AppTheme.info500,
+                      ),
+                    if (progressionRules.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary500.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppTheme.primary500.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Rule-based Progression Engine',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              progressionRules['ruleStatement']?.toString() ??
+                                  'Learners progress when completion, assessment, project, and participation thresholds are met.',
+                              style: const TextStyle(
+                                color: AppTheme.textLight,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                _BlendPill(
+                                  label: 'Completion',
+                                  value:
+                                      '${progressionRules['completionThresholdPercent'] ?? 75}%',
+                                  color: AppTheme.success500,
+                                ),
+                                _BlendPill(
+                                  label: 'Assessment',
+                                  value:
+                                      '${progressionRules['assessmentScoreThresholdPercent'] ?? 60}%',
+                                  color: AppTheme.info500,
+                                ),
+                                _BlendPill(
+                                  label: 'Live Participation',
+                                  value:
+                                      '${progressionRules['liveParticipationThresholdPercent'] ?? 70}%',
+                                  color: AppTheme.warning500,
+                                ),
+                                _BlendPill(
+                                  label: 'Project',
+                                  value:
+                                      (progressionRules['projectSubmissionRequired'] ==
+                                          true)
+                                      ? 'Required'
+                                      : 'Optional',
+                                  color: AppTheme.secondary500,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (recognitionSystem.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      _chipList(
+                        title: 'Recognition System',
+                        values: recognitionSystem,
+                        color: AppTheme.success500,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _SectionCard(
+                title: 'Essential Product Requirements',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _lowBandwidthMode,
+                      onChanged: (value) {
+                        setState(() => _lowBandwidthMode = value);
+                      },
+                      title: const Text(
+                        'Low-bandwidth viewing mode',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      subtitle: const Text(
+                        'Optimized media loading and compact classroom layout for weak networks.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      ),
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _parentAccessEnabled,
+                      onChanged: (value) {
+                        setState(() => _parentAccessEnabled = value);
+                      },
+                      title: const Text(
+                        'Parent access for younger learners',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      subtitle: const Text(
+                        'Enable guardian visibility, alerts, and progress tracking permissions.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      ),
+                    ),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      value: _moderationControlsEnabled,
+                      onChanged: (value) {
+                        setState(() => _moderationControlsEnabled = value);
+                      },
+                      title: const Text(
+                        'Moderation and code-of-conduct controls',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      subtitle: const Text(
+                        'Keep classroom safety workflows active for facilitator and admin teams.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _chipList(
+                      title: 'Developer Requirements Checklist',
+                      values: essentialRequirements,
+                      color: AppTheme.secondary500,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _SectionCard(
+                title: 'Recommended Next Development Documents',
+                child: nextDevelopmentDocs.isEmpty
+                    ? const Text(
+                        'No roadmap documents configured yet.',
+                        style: TextStyle(color: AppTheme.textMuted),
+                      )
+                    : Column(
+                        children: nextDevelopmentDocs
+                            .map(
+                              (doc) => ListTile(
+                                contentPadding: EdgeInsets.zero,
+                                leading: const Icon(
+                                  Icons.description_outlined,
+                                  color: AppTheme.primary400,
+                                ),
+                                title: Text(
+                                  doc,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                subtitle: const Text(
+                                  'Recommended for delivery-quality implementation and team alignment.',
+                                  style: TextStyle(
+                                    color: AppTheme.textMuted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
               ),
               const SizedBox(height: 16),
               // ──────────────────────────────────────────────────────────
@@ -1946,6 +2147,14 @@ class _FacilitatorClassroomScreenState
     String selectedTemplateStrand = strandOptions.isNotEmpty
         ? strandOptions.first
         : '';
+    final mediaPicker = ImagePicker();
+    final selectedUploadedAssets = <Map<String, String>>[];
+    String selectedAssessmentTrack = 'quiz_short_test';
+    String selectedRecognitionTrack = 'skill_badge';
+    int completionThresholdPercent = 75;
+    int assessmentThresholdPercent = 60;
+    int liveParticipationThresholdPercent = 70;
+    bool projectSubmissionRequired = true;
 
     void applyTemplate({bool forceOverwrite = false}) {
       final selectedBlueprint = resolveSelectedBlueprint();
@@ -2048,6 +2257,67 @@ class _FacilitatorClassroomScreenState
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            Future<void> pickPdfAsset() async {
+              final result = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['pdf'],
+              );
+              if (result == null || result.files.isEmpty) return;
+              final file = result.files.first;
+              setSheetState(() {
+                selectedUploadedAssets.add({
+                  'type': 'pdf',
+                  'name': file.name,
+                  'source': 'device',
+                });
+                if (downloadableCtrl.text.trim().isEmpty) {
+                  downloadableCtrl.text = file.name;
+                } else {
+                  downloadableCtrl.text =
+                      '${downloadableCtrl.text.trim()}, ${file.name}';
+                }
+                resourceCtrl.text = resourceCtrl.text.trim().isEmpty
+                    ? 'local://${file.name}'
+                    : resourceCtrl.text;
+              });
+            }
+
+            Future<void> pickImageAsset() async {
+              final file = await mediaPicker.pickImage(
+                source: ImageSource.gallery,
+                imageQuality: 80,
+              );
+              if (file == null) return;
+              setSheetState(() {
+                selectedUploadedAssets.add({
+                  'type': 'image',
+                  'name': file.name,
+                  'source': 'gallery',
+                });
+                resourceCtrl.text = resourceCtrl.text.trim().isEmpty
+                    ? file.path
+                    : resourceCtrl.text;
+              });
+            }
+
+            Future<void> pickVideoAsset() async {
+              final file = await mediaPicker.pickVideo(
+                source: ImageSource.gallery,
+                maxDuration: const Duration(minutes: 20),
+              );
+              if (file == null) return;
+              setSheetState(() {
+                selectedUploadedAssets.add({
+                  'type': 'video',
+                  'name': file.name,
+                  'source': 'gallery',
+                });
+                resourceCtrl.text = resourceCtrl.text.trim().isEmpty
+                    ? file.path
+                    : resourceCtrl.text;
+              });
+            }
+
             return Padding(
               padding: EdgeInsets.only(
                 left: 16,
@@ -2320,6 +2590,216 @@ class _FacilitatorClassroomScreenState
                         maxLines: 3,
                       ),
                       const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.info500.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppTheme.info500.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Course and Assessment Asset Upload',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Upload PDF, image, and video assets used for course content, assignments, and classroom replay references.',
+                              style: TextStyle(
+                                color: AppTheme.textMuted,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: pickPdfAsset,
+                                  icon: const Icon(Icons.picture_as_pdf),
+                                  label: const Text('Upload PDF'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: pickImageAsset,
+                                  icon: const Icon(Icons.image_outlined),
+                                  label: const Text('Upload Image'),
+                                ),
+                                OutlinedButton.icon(
+                                  onPressed: pickVideoAsset,
+                                  icon: const Icon(Icons.video_file_outlined),
+                                  label: const Text('Upload Video'),
+                                ),
+                              ],
+                            ),
+                            if (selectedUploadedAssets.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: selectedUploadedAssets
+                                    .map(
+                                      (asset) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.dark700,
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '${asset['type']?.toUpperCase() ?? 'ASSET'} • ${asset['name'] ?? ''}',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _dropdownField(
+                        label: 'Assessment Track',
+                        value: selectedAssessmentTrack,
+                        items: const [
+                          {
+                            'id': 'quiz_short_test',
+                            'title': 'Quizzes and short tests',
+                          },
+                          {
+                            'id': 'worksheet_practical',
+                            'title': 'Worksheets and practical tasks',
+                          },
+                          {
+                            'id': 'reflection_journal',
+                            'title': 'Reflection journals',
+                          },
+                          {
+                            'id': 'project_submission',
+                            'title': 'Project submissions',
+                          },
+                          {
+                            'id': 'live_attendance',
+                            'title': 'Live classroom attendance',
+                          },
+                          {
+                            'id': 'participation_presentation',
+                            'title': 'Participation and presentation scores',
+                          },
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setSheetState(() => selectedAssessmentTrack = value);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _dropdownField(
+                        label: 'Recognition Trigger',
+                        value: selectedRecognitionTrack,
+                        items: const [
+                          {'id': 'skill_badge', 'title': 'Skill badge'},
+                          {'id': 'value_badge', 'title': 'Value badge'},
+                          {
+                            'id': 'attendance_recognition',
+                            'title': 'Attendance recognition',
+                          },
+                          {
+                            'id': 'term_certificate',
+                            'title': 'Term certificate',
+                          },
+                          {
+                            'id': 'level_certificate',
+                            'title': 'Level completion certificate',
+                          },
+                          {'id': 'showcase_award', 'title': 'Showcase award'},
+                          {
+                            'id': 'facilitator_recommendation',
+                            'title': 'Facilitator recommendation marker',
+                          },
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setSheetState(() => selectedRecognitionTrack = value);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        value: projectSubmissionRequired,
+                        onChanged: (value) {
+                          setSheetState(
+                            () => projectSubmissionRequired = value,
+                          );
+                        },
+                        title: const Text(
+                          'Require project submission for progression',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Completion threshold: $completionThresholdPercent%',
+                        style: const TextStyle(color: AppTheme.textMuted),
+                      ),
+                      Slider(
+                        min: 40,
+                        max: 100,
+                        divisions: 12,
+                        value: completionThresholdPercent.toDouble(),
+                        onChanged: (value) {
+                          setSheetState(() {
+                            completionThresholdPercent = value.round();
+                          });
+                        },
+                      ),
+                      Text(
+                        'Assessment threshold: $assessmentThresholdPercent%',
+                        style: const TextStyle(color: AppTheme.textMuted),
+                      ),
+                      Slider(
+                        min: 40,
+                        max: 100,
+                        divisions: 12,
+                        value: assessmentThresholdPercent.toDouble(),
+                        onChanged: (value) {
+                          setSheetState(() {
+                            assessmentThresholdPercent = value.round();
+                          });
+                        },
+                      ),
+                      Text(
+                        'Live participation threshold: $liveParticipationThresholdPercent%',
+                        style: const TextStyle(color: AppTheme.textMuted),
+                      ),
+                      Slider(
+                        min: 40,
+                        max: 100,
+                        divisions: 12,
+                        value: liveParticipationThresholdPercent.toDouble(),
+                        onChanged: (value) {
+                          setSheetState(() {
+                            liveParticipationThresholdPercent = value.round();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
                       _textField(
                         controller: downloadableCtrl,
                         label: 'Downloadable Resources / Worksheets',
@@ -2406,6 +2886,19 @@ class _FacilitatorClassroomScreenState
                             'prerequisiteContent': prerequisiteCtrl.text.trim(),
                             'completionStatus': completionStatusCtrl.text
                                 .trim(),
+                            'uploadedAssets': selectedUploadedAssets,
+                            'assessmentSignals': [selectedAssessmentTrack],
+                            'progressionRules': {
+                              'completionThresholdPercent':
+                                  completionThresholdPercent,
+                              'assessmentScoreThresholdPercent':
+                                  assessmentThresholdPercent,
+                              'liveParticipationThresholdPercent':
+                                  liveParticipationThresholdPercent,
+                              'projectSubmissionRequired':
+                                  projectSubmissionRequired,
+                            },
+                            'recognitionTargets': [selectedRecognitionTrack],
                             'status': 'pending',
                           };
 

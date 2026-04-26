@@ -54,6 +54,7 @@ dependencies:
   
   # Image & File Handling
   image_picker: ^1.0.4
+  file_picker: ^10.3.2
   cached_network_image: ^3.3.0
   path_provider: ^2.1.1
   video_player: ^2.9.2

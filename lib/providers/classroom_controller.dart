@@ -319,6 +319,57 @@ class ClassroomController extends GetxController {
         .toList();
   }
 
+  Map<String, dynamic> get assessmentProgressionRecognition {
+    final source = liveFacilitatorFramework['assessmentProgressionRecognition'];
+    if (source is Map<String, dynamic>) return source;
+    if (source is Map) return Map<String, dynamic>.from(source);
+    return {};
+  }
+
+  List<String> get assessmentSignals {
+    final source = assessmentProgressionRecognition['assessmentSignals'];
+    if (source is! List) return [];
+    return source
+        .map((item) => item.toString())
+        .where((value) => value.trim().isNotEmpty)
+        .toList();
+  }
+
+  Map<String, dynamic> get progressionRules {
+    final source = assessmentProgressionRecognition['progressionRules'];
+    if (source is Map<String, dynamic>) return source;
+    if (source is Map) return Map<String, dynamic>.from(source);
+    return {};
+  }
+
+  List<String> get recognitionSystem {
+    final source = assessmentProgressionRecognition['recognitionSystem'];
+    if (source is! List) return [];
+    return source
+        .map((item) => item.toString())
+        .where((value) => value.trim().isNotEmpty)
+        .toList();
+  }
+
+  List<String> get essentialProductRequirements {
+    final source = liveFacilitatorFramework['essentialProductRequirements'];
+    if (source is! List) return [];
+    return source
+        .map((item) => item.toString())
+        .where((value) => value.trim().isNotEmpty)
+        .toList();
+  }
+
+  List<String> get recommendedNextDevelopmentDocuments {
+    final source =
+        liveFacilitatorFramework['recommendedNextDevelopmentDocuments'];
+    if (source is! List) return [];
+    return source
+        .map((item) => item.toString())
+        .where((value) => value.trim().isNotEmpty)
+        .toList();
+  }
+
   List<Map<String, dynamic>> get fourLevelCurriculumFramework {
     final source = blueprint['fourLevelCurriculumFramework'];
     if (source is! List) return [];
