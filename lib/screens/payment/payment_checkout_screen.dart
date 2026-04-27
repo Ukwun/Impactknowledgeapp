@@ -172,9 +172,10 @@ class _PaymentCheckoutScreenState extends State<PaymentCheckoutScreen> {
         ),
       );
 
-      // Launch hosted checkout URL returned by the backend payment provider
-      if (await canLaunch(response.paymentUrl)) {
-        await launch(response.paymentUrl);
+      // Launch hosted checkout URL returned by the backend payment provider.
+      final paymentUri = Uri.tryParse(response.paymentUrl);
+      if (paymentUri != null && await canLaunchUrl(paymentUri)) {
+        await launchUrl(paymentUri, mode: LaunchMode.externalApplication);
       }
     } else {
       Navigator.of(context).pop();
@@ -233,7 +234,7 @@ class _PaymentMethodCard extends StatelessWidget {
       onTap: onTap,
       child: Card(
         margin: EdgeInsets.zero,
-        color: isSelected ? Colors.deepPurple.withOpacity(0.1) : null,
+        color: isSelected ? Colors.deepPurple.withValues(alpha: 0.1) : null,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: isSelected
@@ -636,7 +637,7 @@ class _DetailField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      color: highlighted ? Colors.deepPurple.withOpacity(0.05) : null,
+      color: highlighted ? Colors.deepPurple.withValues(alpha: 0.05) : null,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(

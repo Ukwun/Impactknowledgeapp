@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../config/role_dashboard_resolver.dart';
 import '../../config/app_config.dart';
@@ -45,12 +46,20 @@ class DashboardService {
 
   Future<Map<String, dynamic>> fetchFacilitatorDashboard() => _withCache(
     'facilitator',
-    () => _getFromEndpoints(['api/dashboard/facilitator']),
+    () => _getDashboardBundle(
+      dashboardEndpoints: ['api/dashboard/facilitator'],
+      includeInsights: true,
+      includeRecommendations: true,
+    ),
   );
 
   Future<Map<String, dynamic>> fetchSchoolAdminDashboard() => _withCache(
     'school_admin',
-    () => _getFromEndpoints(['api/dashboard/school-admin']),
+    () => _getDashboardBundle(
+      dashboardEndpoints: ['api/dashboard/school-admin'],
+      includeInsights: true,
+      includeRecommendations: true,
+    ),
   );
 
   Future<Map<String, dynamic>> fetchMentorDashboard() =>
@@ -66,8 +75,63 @@ class DashboardService {
     () => _getFromEndpoints(['api/dashboard/uni-member']),
   );
 
-  Future<Map<String, dynamic>> fetchAdminDashboard() =>
-      _withCache('admin', () => _getFromEndpoints(['api/dashboard/admin']));
+  Future<Map<String, dynamic>> fetchAdminDashboard() => _withCache(
+    'admin',
+    () => _getDashboardBundle(
+      dashboardEndpoints: ['api/dashboard/admin'],
+      includeInsights: true,
+      includeRecommendations: true,
+    ),
+  );
+
+  Future<Map<String, dynamic>> _getDashboardBundle({
+    required List<String> dashboardEndpoints,
+    bool includeInsights = false,
+    bool includeRecommendations = false,
+  }) async {
+    final base = await _getFromEndpoints(dashboardEndpoints);
+    final merged = Map<String, dynamic>.from(base);
+    final summary = Map<String, dynamic>.from(
+      merged['summary'] is Map<String, dynamic> ? merged['summary'] : {},
+    );
+
+    if (includeInsights) {
+      final insights = await _tryGetFromEndpoint(
+        'api/analytics/cohort-insights?daysBack=30',
+      );
+      final insightsSummary = insights['summary'] is Map<String, dynamic>
+          ? Map<String, dynamic>.from(insights['summary'])
+          : <String, dynamic>{};
+      summary.addAll(insightsSummary);
+      if (insights.isNotEmpty) {
+        merged['analytics'] = insights;
+      }
+    }
+
+    if (includeRecommendations) {
+      final guidance = await _tryGetFromEndpoint(
+        'api/analytics/recommendations/me',
+      );
+      final recommendations = guidance['recommendations'];
+      final interventions = guidance['interventions'];
+      if (recommendations is List) {
+        merged['recommendations'] = recommendations;
+      }
+      if (interventions is List) {
+        merged['interventions'] = interventions;
+        summary['interventionQueue'] = interventions.length;
+      }
+      if (guidance['analytics'] is Map<String, dynamic>) {
+        merged['analyticsProfile'] = guidance['analytics'];
+      }
+    }
+
+    if (summary.isNotEmpty) {
+      merged['summary'] = summary;
+    }
+
+    return merged;
+  }
 
   Future<Map<String, dynamic>> _withCache(
     String roleKey,
@@ -103,7 +167,7 @@ class DashboardService {
         // Get token directly from secure storage
         final token = await _secureStorage.read(key: AppConfig.tokenKey);
 
-        print(
+        debugPrint(
           '🔑 DASHBOARD TOKEN: ${token != null ? '${token.substring(0, 50)}...' : 'NULL'}',
         );
 
@@ -113,7 +177,7 @@ class DashboardService {
             : '${AppConfig.apiBaseUrl}/';
         final url = Uri.parse('$baseUrl$endpoint');
 
-        print('→ DASHBOARD: GET $url with Authorization header');
+        debugPrint('→ DASHBOARD: GET $url with Authorization header');
 
         final response = await http
             .get(
@@ -128,7 +192,7 @@ class DashboardService {
               onTimeout: () => throw Exception('Dashboard timeout'),
             );
 
-        print('← DASHBOARD: ${response.statusCode}');
+        debugPrint('← DASHBOARD: ${response.statusCode}');
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -137,7 +201,7 @@ class DashboardService {
           throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
-        print('✗ DASHBOARD ERROR: $e');
+        debugPrint('✗ DASHBOARD ERROR: $e');
         lastError = e;
       }
     }
@@ -155,5 +219,13 @@ class DashboardService {
       return response;
     }
     return {};
+  }
+
+  Future<Map<String, dynamic>> _tryGetFromEndpoint(String endpoint) async {
+    try {
+      return await _getFromEndpoints([endpoint]);
+    } catch (_) {
+      return {};
+    }
   }
 }

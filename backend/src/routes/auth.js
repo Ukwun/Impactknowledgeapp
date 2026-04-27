@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const { query } = require('../database');
 const { verifyToken } = require('../middleware/auth');
+const { validateBody } = require('../middleware/requestValidation');
+const { refreshLimiter } = require('../middleware/rateLimiter');
 const ActivityService = require('../services/activity-service');
 const AuditService = require('../services/audit-service');
 
@@ -24,6 +26,19 @@ function devLog(...args) {
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
 }
+
+const allowedRoles = [
+  'student',
+  'learner',
+  'parent',
+  'facilitator',
+  'instructor',
+  'school_admin',
+  'mentor',
+  'admin',
+  'circle_member',
+  'uni_member',
+];
 
 devLog('AUTH route initialized with PostgreSQL backend');
 
@@ -63,7 +78,15 @@ async function revokeRefreshToken(tokenJti) {
 }
 
 // Register endpoint
-router.post('/register', async (req, res) => {
+router.post('/register', validateBody({
+  email: { type: 'string', required: true, maxLength: 160 },
+  password: { type: 'string', required: true, minLength: 6, maxLength: 128 },
+  full_name: { type: 'string', required: true, maxLength: 160 },
+  role: { type: 'string', enum: allowedRoles },
+  termsAccepted: { type: 'boolean' },
+  privacyAccepted: { type: 'boolean' },
+  consentVersion: { type: 'string', maxLength: 40 },
+}), async (req, res) => {
   devLog('REGISTER attempt', { email: req.body.email, name: req.body.full_name });
   
   try {
@@ -192,7 +215,10 @@ router.post('/register', async (req, res) => {
 });
 
 // Login endpoint
-router.post('/login', async (req, res) => {
+router.post('/login', validateBody({
+  email: { type: 'string', required: true, maxLength: 160 },
+  password: { type: 'string', required: true, minLength: 6, maxLength: 128 },
+}), async (req, res) => {
   devLog('LOGIN attempt', { email: req.body.email });
   
   try {
@@ -393,7 +419,9 @@ router.post('/logout', verifyToken, async (req, res) => {
 });
 
 // Refresh token endpoint
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', refreshLimiter, validateBody({
+  refreshToken: { type: 'string', required: true, minLength: 20, maxLength: 4096 },
+}), async (req, res) => {
   try {
     const { refreshToken } = req.body;
 
@@ -479,7 +507,10 @@ router.post('/refresh', async (req, res) => {
 });
 
 // Change password endpoint
-router.post('/change-password', verifyToken, async (req, res) => {
+router.post('/change-password', verifyToken, validateBody({
+  currentPassword: { type: 'string', required: true, minLength: 6, maxLength: 128 },
+  newPassword: { type: 'string', required: true, minLength: 6, maxLength: 128 },
+}), async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
     const userId = req.user.id;
@@ -563,7 +594,12 @@ router.post('/change-password', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/consent', verifyToken, async (req, res) => {
+router.post('/consent', verifyToken, validateBody({
+  consentType: { type: 'string', required: true, maxLength: 80 },
+  consentVersion: { type: 'string', required: true, maxLength: 40 },
+  accepted: { type: 'boolean' },
+  metadata: { type: 'object' },
+}), async (req, res) => {
   try {
     const { consentType, consentVersion, accepted = true, metadata = {} } = req.body || {};
 

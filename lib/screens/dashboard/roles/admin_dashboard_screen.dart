@@ -28,6 +28,16 @@ class AdminDashboardScreen extends StatelessWidget {
           : const Duration(seconds: 30),
       builder: (context, data, isRefreshing, lastUpdated, reload) {
         final d = AdminDashboardData.fromJson(data);
+        final recommendations = (data['recommendations'] is List)
+            ? (data['recommendations'] as List)
+                  .map((item) => item.toString())
+                  .toList()
+            : const <String>[];
+        final interventions = (data['interventions'] is List)
+            ? (data['interventions'] as List)
+                  .map((item) => item.toString())
+                  .toList()
+            : const <String>[];
         final attendanceRate = _pickInt(data, [
           'summary.cohortAttendanceRate',
           'institutionStats.attendanceRate',
@@ -111,6 +121,16 @@ class AdminDashboardScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
+            RoleDashboardInsightPanel(
+              title: 'Recommended Actions',
+              icon: Icons.lightbulb_outline,
+              items: recommendations,
+            ),
+            RoleDashboardInsightPanel(
+              title: 'Intervention Queue',
+              icon: Icons.notifications_active_outlined,
+              items: interventions,
+            ),
             RoleActionTile(
               title: 'Platform Analytics',
               subtitle: 'Audit courses and system-wide performance.',

@@ -1,6 +1,7 @@
 const express = require('express');
-const { query, pool } = require('../database');
+const { query } = require('../database');
 const { verifyToken, requireRoles } = require('../middleware/auth');
+const { warningThresholdsMs } = require('../middleware/observability');
 
 const router = express.Router();
 
@@ -65,6 +66,41 @@ router.get('/incident-runbook', verifyToken, requireRoles('admin', 'school_admin
         'Declare incident severity and owner',
         'Communicate user impact within 15 minutes',
         'Mitigate, verify, and publish postmortem with actions',
+      ],
+    },
+  });
+});
+
+router.get('/alert-thresholds', verifyToken, requireRoles('admin', 'school_admin'), async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      latencyThresholdsMs: warningThresholdsMs,
+      operationalAlerts: {
+        api5xxRatePercent: 2,
+        paymentFailures7d: 10,
+        atRiskLearners: 25,
+        openSupportTickets: 20,
+      },
+    },
+  });
+});
+
+router.get('/upload-readiness', verifyToken, requireRoles('admin', 'school_admin'), async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      storageProvider: 'cloudinary',
+      configured: Boolean(
+        process.env.CLOUDINARY_CLOUD_NAME &&
+          process.env.CLOUDINARY_API_KEY &&
+          process.env.CLOUDINARY_API_SECRET
+      ),
+      requiredEnvVars: [
+        'CLOUDINARY_CLOUD_NAME',
+        'CLOUDINARY_API_KEY',
+        'CLOUDINARY_API_SECRET',
+        'JWT_REFRESH_SECRET',
       ],
     },
   });

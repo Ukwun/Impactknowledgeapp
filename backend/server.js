@@ -5,7 +5,15 @@ require('dotenv').config({
 const express = require('express');
 const cors = require('cors');
 const { initializeDatabase } = require('./src/database');
-const { globalLimiter, authLimiter, paymentLimiter } = require('./src/middleware/rateLimiter');
+const {
+  globalLimiter,
+  authLimiter,
+  paymentLimiter,
+  apiLimiter,
+  analyticsLimiter,
+  systemLimiter,
+} = require('./src/middleware/rateLimiter');
+const { requestObservability } = require('./src/middleware/observability');
 const authRoutes = require('./src/routes/auth');
 const courseRoutes = require('./src/routes/courses');
 const achievementRoutes = require('./src/routes/achievements');
@@ -30,6 +38,7 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: true }));
+app.use(requestObservability);
 
 // Apply global rate limiter (all endpoints except /health)
 app.use(globalLimiter);
@@ -70,14 +79,14 @@ app.post('/api/test', (req, res) => {
 
 // Routes
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/courses', courseRoutes);
+app.use('/api/courses', apiLimiter, courseRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/users', require('./src/routes/users'));
-app.use('/api/enrollments', require('./src/routes/enrollments'));
+app.use('/api/enrollments', apiLimiter, require('./src/routes/enrollments'));
 app.use('/api/leaderboard', require('./src/routes/leaderboard'));
 app.use('/api/membership-tiers', require('./src/routes/membership'));
 app.use('/api/payments', paymentLimiter, paymentRoutes);
-app.use('/api/dashboard', require('./src/routes/dashboard'));
+app.use('/api/dashboard', apiLimiter, require('./src/routes/dashboard'));
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/events', eventRoutes);
@@ -89,10 +98,10 @@ app.use('/api/search', require('./src/routes/search'));
 app.use('/api/notifications', require('./src/routes/notifications'));
 app.use('/api/role-resources', require('./src/routes/role_resources'));
 app.use('/api/relationships', require('./src/routes/relationships'));
-app.use('/api/classroom', require('./src/routes/classroom'));
-app.use('/api/uploads', uploadsRoutes);
-app.use('/api/analytics', analyticsEventsRoutes);
-app.use('/api/system', systemRoutes);
+app.use('/api/classroom', apiLimiter, require('./src/routes/classroom'));
+app.use('/api/uploads', apiLimiter, uploadsRoutes);
+app.use('/api/analytics', analyticsLimiter, analyticsEventsRoutes);
+app.use('/api/system', systemLimiter, systemRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -101,9 +110,19 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
+  console.error(
+    JSON.stringify({
+      level: 'error',
+      type: 'unhandled_error',
+      requestId: req.requestId || null,
+      path: req.originalUrl,
+      method: req.method,
+      error: err.message || 'Internal server error',
+    })
+  );
   res.status(err.status || 500).json({
-    error: err.message || 'Internal server error'
+    error: err.message || 'Internal server error',
+    requestId: req.requestId || null,
   });
 });
 

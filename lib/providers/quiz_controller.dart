@@ -1,6 +1,9 @@
 import 'package:get/get.dart';
+import 'package:logger/logger.dart';
 import '../services/api/api_service.dart';
 import '../config/service_locator.dart';
+
+final Logger _logger = Logger();
 
 class QuizController extends GetxController {
   final apiService = getIt<ApiService>();
@@ -34,7 +37,7 @@ class QuizController extends GetxController {
       }
     } catch (e) {
       error.value = 'Failed to load quizzes: ${e.toString()}';
-      print('Error loading quizzes: $e');
+      _logger.e('Error loading quizzes', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -82,7 +85,7 @@ class QuizController extends GetxController {
       _startTimer();
     } catch (e) {
       error.value = 'Failed to start quiz: ${e.toString()}';
-      print('Error starting quiz: $e');
+      _logger.e('Error starting quiz', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -117,7 +120,7 @@ class QuizController extends GetxController {
       return false;
     } catch (e) {
       error.value = 'Failed to submit quiz: ${e.toString()}';
-      print('Error submitting quiz: $e');
+      _logger.e('Error submitting quiz', error: e);
       return false;
     } finally {
       isLoading.value = false;
@@ -164,7 +167,7 @@ class QuizController extends GetxController {
       }
     } catch (e) {
       error.value = 'Failed to load leaderboard: ${e.toString()}';
-      print('Error loading leaderboard: $e');
+      _logger.e('Error loading leaderboard', error: e);
     }
   }
 

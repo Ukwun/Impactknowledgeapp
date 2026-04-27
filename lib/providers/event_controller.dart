@@ -1,6 +1,9 @@
 import 'package:get/get.dart';
+import 'package:logger/logger.dart';
 import '../services/api/api_service.dart';
 import '../config/service_locator.dart';
+
+final Logger _logger = Logger();
 
 class EventController extends GetxController {
   final apiService = getIt<ApiService>();
@@ -53,7 +56,7 @@ class EventController extends GetxController {
       _updateUpcomingEvents();
     } catch (e) {
       error.value = 'Failed to load events: ${e.toString()}';
-      print('Error loading events: $e');
+      _logger.e('Error loading events', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -77,7 +80,7 @@ class EventController extends GetxController {
       }
     } catch (e) {
       error.value = 'Failed to load registered events: ${e.toString()}';
-      print('Error loading registered events: $e');
+      _logger.e('Error loading registered events', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -100,7 +103,7 @@ class EventController extends GetxController {
       }
     } catch (e) {
       error.value = 'Failed to load upcoming events: ${e.toString()}';
-      print('Error loading upcoming events: $e');
+      _logger.e('Error loading upcoming events', error: e);
     }
   }
 
@@ -116,7 +119,7 @@ class EventController extends GetxController {
           : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load event: ${e.toString()}';
-      print('Error loading event: $e');
+      _logger.e('Error loading event', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -127,7 +130,7 @@ class EventController extends GetxController {
     try {
       return events.firstWhereOrNull((e) => e['id'] == eventId);
     } catch (e) {
-      print('Error getting event: $e');
+      _logger.e('Error getting event', error: e);
       return null;
     }
   }
@@ -160,7 +163,7 @@ class EventController extends GetxController {
       return false;
     } catch (e) {
       error.value = 'Failed to register: ${e.toString()}';
-      print('Error registering: $e');
+      _logger.e('Error registering for event', error: e);
       return false;
     } finally {
       isLoading.value = false;
@@ -194,7 +197,7 @@ class EventController extends GetxController {
       return false;
     } catch (e) {
       error.value = 'Failed to unregister: ${e.toString()}';
-      print('Error unregistering: $e');
+      _logger.e('Error unregistering from event', error: e);
       return false;
     } finally {
       isLoading.value = false;
@@ -215,7 +218,7 @@ class EventController extends GetxController {
       return null;
     } catch (e) {
       error.value = 'Failed to load attendees: ${e.toString()}';
-      print('Error loading attendees: $e');
+      _logger.e('Error loading event attendees', error: e);
     }
     return null;
   }
@@ -229,7 +232,7 @@ class EventController extends GetxController {
       return response is Map ? response : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load analytics: ${e.toString()}';
-      print('Error loading analytics: $e');
+      _logger.e('Error loading event analytics', error: e);
       return null;
     }
   }

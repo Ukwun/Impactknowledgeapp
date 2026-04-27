@@ -101,12 +101,18 @@ class FacilitatorDashboardData {
   final int pendingReviews;
   final int atRiskLearners;
   final int unreadMessages;
+  final int cohortRetentionRate;
+  final int engagementRate;
+  final int interventionQueue;
 
   const FacilitatorDashboardData({
     required this.activeClasses,
     required this.pendingReviews,
     required this.atRiskLearners,
     required this.unreadMessages,
+    required this.cohortRetentionRate,
+    required this.engagementRate,
+    required this.interventionQueue,
   });
 
   factory FacilitatorDashboardData.fromJson(Map<String, dynamic> json) =>
@@ -131,6 +137,18 @@ class FacilitatorDashboardData {
           'messages.unread',
           'unreadMessages',
         ]),
+        cohortRetentionRate: _int(json, [
+          'summary.cohortRetentionRate',
+          'analytics.summary.cohortRetentionRate',
+        ]),
+        engagementRate: _int(json, [
+          'summary.engagementRate',
+          'analytics.summary.engagementRate',
+        ]),
+        interventionQueue: _int(json, [
+          'summary.interventionQueue',
+          'analytics.summary.interventionQueue',
+        ]),
       );
 }
 
@@ -141,12 +159,20 @@ class SchoolAdminDashboardData {
   final int totalFacilitators;
   final int completionRate;
   final int openAlerts;
+  final int cohortRetentionRate;
+  final int engagementRate;
+  final int interventionQueue;
+  final int atRiskLearners;
 
   const SchoolAdminDashboardData({
     required this.totalStudents,
     required this.totalFacilitators,
     required this.completionRate,
     required this.openAlerts,
+    required this.cohortRetentionRate,
+    required this.engagementRate,
+    required this.interventionQueue,
+    required this.atRiskLearners,
   });
 
   factory SchoolAdminDashboardData.fromJson(Map<String, dynamic> json) =>
@@ -170,6 +196,22 @@ class SchoolAdminDashboardData {
           'summary.openAlerts',
           'openAlerts',
           'alertsCount',
+        ]),
+        cohortRetentionRate: _int(json, [
+          'summary.cohortRetentionRate',
+          'analytics.summary.cohortRetentionRate',
+        ]),
+        engagementRate: _int(json, [
+          'summary.engagementRate',
+          'analytics.summary.engagementRate',
+        ]),
+        interventionQueue: _int(json, [
+          'summary.interventionQueue',
+          'analytics.summary.interventionQueue',
+        ]),
+        atRiskLearners: _int(json, [
+          'summary.atRiskLearners',
+          'analytics.summary.atRiskLearners',
         ]),
       );
 }

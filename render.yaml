@@ -12,5 +12,21 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: OBS_AUTH_WARN_MS
+        value: "600"
+      - key: OBS_CLASSROOM_WARN_MS
+        value: "800"
+      - key: OBS_UPLOADS_WARN_MS
+        value: "1200"
+      - key: OBS_PAYMENTS_WARN_MS
+        value: "1500"
       - key: NODE_ENV
         value: production

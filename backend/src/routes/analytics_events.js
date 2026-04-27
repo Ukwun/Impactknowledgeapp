@@ -1,6 +1,7 @@
 const express = require('express');
 const { query } = require('../database');
 const { verifyToken, requireRoles } = require('../middleware/auth');
+const { validateBody, validateQuery } = require('../middleware/requestValidation');
 const AuditService = require('../services/audit-service');
 
 const router = express.Router();
@@ -26,7 +27,113 @@ router.get('/taxonomy', verifyToken, (req, res) => {
   res.json({ success: true, data: TAXONOMY });
 });
 
-router.post('/events', verifyToken, async (req, res) => {
+router.get(
+  '/cohort-insights',
+  verifyToken,
+  requireRoles('facilitator', 'instructor', 'school_admin', 'admin'),
+  validateQuery({
+    daysBack: { type: 'number', integer: true, min: 7, max: 90 },
+  }),
+  async (req, res) => {
+    try {
+      const daysBack = Number(req.query.daysBack || 30);
+      const isFacilitatorScope = ['facilitator', 'instructor'].includes(req.user.role);
+      const scopeParams = isFacilitatorScope ? [req.user.id] : [];
+      const learnerScopeSql = isFacilitatorScope
+        ? `SELECT DISTINCT e.user_id
+           FROM courses c
+           JOIN enrollments e ON e.course_id = c.id
+           WHERE c.instructor_id = $1`
+        : `SELECT id AS user_id
+           FROM users
+           WHERE role IN ('student', 'learner')`;
+
+      const insightsResult = await query(
+        `WITH scoped_learners AS (
+           ${learnerScopeSql}
+         ), learner_analytics AS (
+           SELECT
+             sl.user_id,
+             ua.engagement_level,
+             ua.churn_risk_score,
+             ua.last_active_at,
+             COALESCE(ua.total_lessons_completed, 0) AS lessons_completed,
+             COALESCE(ua.total_courses_completed, 0) AS courses_completed
+           FROM scoped_learners sl
+           LEFT JOIN user_analytics ua ON ua.user_id = sl.user_id
+         ), learner_progress AS (
+           SELECT
+             e.user_id,
+             AVG(COALESCE(e.progress_percentage, 0))::numeric(10,2) AS avg_progress,
+             COUNT(*) FILTER (WHERE e.completion_status = 'completed')::int AS completed_enrollments
+           FROM enrollments e
+           WHERE e.user_id IN (SELECT user_id FROM scoped_learners)
+           GROUP BY e.user_id
+         )
+         SELECT
+           COUNT(*)::int AS total_learners,
+           COUNT(*) FILTER (
+             WHERE la.last_active_at >= NOW() - ($${scopeParams.length + 1} || ' days')::interval
+           )::int AS retained_learners,
+           COUNT(*) FILTER (
+             WHERE COALESCE(la.engagement_level, 'low') IN ('medium', 'high')
+           )::int AS engaged_learners,
+           COUNT(*) FILTER (
+             WHERE COALESCE(la.churn_risk_score, 0) >= 0.70
+           )::int AS at_risk_learners,
+           COALESCE(ROUND(AVG(lp.avg_progress)), 0)::int AS avg_progress,
+           COALESCE(SUM(lp.completed_enrollments), 0)::int AS completed_enrollments
+         FROM learner_analytics la
+         LEFT JOIN learner_progress lp ON lp.user_id = la.user_id`,
+        [...scopeParams, String(daysBack)]
+      );
+
+      const row = insightsResult.rows[0] || {};
+      const totalLearners = Number(row.total_learners || 0);
+      const retainedLearners = Number(row.retained_learners || 0);
+      const engagedLearners = Number(row.engaged_learners || 0);
+      const atRiskLearners = Number(row.at_risk_learners || 0);
+      const cohortRetentionRate = totalLearners > 0
+        ? Math.round((retainedLearners / totalLearners) * 100)
+        : 0;
+      const engagementRate = totalLearners > 0
+        ? Math.round((engagedLearners / totalLearners) * 100)
+        : 0;
+      const interventionQueue = atRiskLearners + Math.max(totalLearners - engagedLearners, 0);
+
+      return res.json({
+        success: true,
+        data: {
+          summary: {
+            totalLearners,
+            retainedLearners,
+            cohortRetentionRate,
+            engagementRate,
+            atRiskLearners,
+            interventionQueue,
+            avgProgress: Number(row.avg_progress || 0),
+            completedEnrollments: Number(row.completed_enrollments || 0),
+            daysBack,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Cohort insights error:', err);
+      return res.status(500).json({ success: false, error: 'Failed to compute cohort insights.' });
+    }
+  }
+);
+
+router.post(
+  '/events',
+  verifyToken,
+  validateBody({
+    eventName: { type: 'string', required: true, maxLength: 80 },
+    resourceType: { type: 'string', maxLength: 80 },
+    resourceId: { type: 'number', integer: true, min: 1 },
+    metadata: { type: 'object' },
+  }),
+  async (req, res) => {
   try {
     const { eventName, resourceType = null, resourceId = null, metadata = {} } = req.body || {};
 
@@ -143,7 +250,15 @@ router.get('/recommendations/me', verifyToken, async (req, res) => {
   }
 });
 
-router.post('/interventions/run', verifyToken, requireRoles('admin', 'facilitator', 'school_admin'), async (req, res) => {
+router.post(
+  '/interventions/run',
+  verifyToken,
+  requireRoles('admin', 'facilitator', 'school_admin'),
+  validateBody({
+    cohortUserIds: { type: 'array', required: true, minItems: 1, items: 'int' },
+    reason: { type: 'string', maxLength: 80 },
+  }),
+  async (req, res) => {
   try {
     const { cohortUserIds = [], reason = 'at_risk' } = req.body || {};
     const ids = Array.isArray(cohortUserIds)

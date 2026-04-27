@@ -28,6 +28,16 @@ class SchoolAdminDashboardScreen extends StatelessWidget {
           : const Duration(seconds: 30),
       builder: (context, data, isRefreshing, lastUpdated, reload) {
         final d = SchoolAdminDashboardData.fromJson(data);
+        final recommendations = (data['recommendations'] is List)
+            ? (data['recommendations'] as List)
+                  .map((item) => item.toString())
+                  .toList()
+            : const <String>[];
+        final interventions = (data['interventions'] is List)
+            ? (data['interventions'] as List)
+                  .map((item) => item.toString())
+                  .toList()
+            : const <String>[];
         final attendanceRate = _pickInt(data, [
           'summary.cohortAttendanceRate',
           'summary.attendanceRate',
@@ -105,6 +115,37 @@ class SchoolAdminDashboardScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
+            RoleDashboardStats(
+              stats: [
+                (
+                  'Retention',
+                  '${d.cohortRetentionRate}%',
+                  Icons.favorite_border,
+                ),
+                ('Engagement', '${d.engagementRate}%', Icons.insights_outlined),
+                (
+                  'Intervention Queue',
+                  d.interventionQueue.toString(),
+                  Icons.rule_folder_outlined,
+                ),
+                (
+                  'At-Risk Learners',
+                  d.atRiskLearners.toString(),
+                  Icons.warning_amber_outlined,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            RoleDashboardInsightPanel(
+              title: 'Recommended Actions',
+              icon: Icons.lightbulb_outline,
+              items: recommendations,
+            ),
+            RoleDashboardInsightPanel(
+              title: 'Interventions to Trigger',
+              icon: Icons.notifications_active_outlined,
+              items: interventions,
+            ),
             RoleActionTile(
               title: 'School Performance',
               subtitle: 'Review courses and academic indicators.',

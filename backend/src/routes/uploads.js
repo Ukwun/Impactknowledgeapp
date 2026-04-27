@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { v2: cloudinary } = require('cloudinary');
 const { query } = require('../database');
 const { verifyToken, requireRoles } = require('../middleware/auth');
+const { validateBody } = require('../middleware/requestValidation');
 const { uploadLimiter } = require('../middleware/rateLimiter');
 const AuditService = require('../services/audit-service');
 
@@ -59,7 +60,13 @@ function validateUploadPolicy({ mimeType, byteSize }) {
   return { ok: true, mediaKind };
 }
 
-router.post('/sign', verifyToken, requireRoles(...facilitatorRoles), uploadLimiter, async (req, res) => {
+router.post('/sign', verifyToken, requireRoles(...facilitatorRoles), uploadLimiter, validateBody({
+  fileName: { type: 'string', required: true, maxLength: 180 },
+  mimeType: { type: 'string', required: true, maxLength: 120 },
+  byteSize: { type: 'number', required: true, integer: true, min: 1 },
+  accessScope: { type: 'string', enum: ['private', 'public'] },
+  purpose: { type: 'string', maxLength: 80 },
+}), async (req, res) => {
   try {
     const {
       fileName,
@@ -175,7 +182,16 @@ router.post('/sign', verifyToken, requireRoles(...facilitatorRoles), uploadLimit
   }
 });
 
-router.post('/complete', verifyToken, requireRoles(...facilitatorRoles), async (req, res) => {
+router.post('/complete', verifyToken, requireRoles(...facilitatorRoles), uploadLimiter, validateBody({
+  assetId: { type: 'number', required: true, integer: true, min: 1 },
+  secureUrl: { type: 'string', required: true, maxLength: 500 },
+  uploadedBytes: { type: 'number', integer: true, min: 1 },
+  format: { type: 'string', maxLength: 32 },
+  duration: { type: 'number', min: 0 },
+  width: { type: 'number', integer: true, min: 0 },
+  height: { type: 'number', integer: true, min: 0 },
+  virusScanStatus: { type: 'string', enum: ['clean', 'quarantined', 'pending_scan'] },
+}), async (req, res) => {
   try {
     const {
       assetId,

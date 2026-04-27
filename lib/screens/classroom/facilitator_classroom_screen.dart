@@ -3100,6 +3100,7 @@ class _FacilitatorClassroomScreenState
                       ),
                       const SizedBox(height: 16),
                       _submitButton(
+                        key: const Key('create_activity_publish_button'),
                         label: 'Publish Activity',
                         onPressed: () async {
                           if (!(formKey.currentState?.validate() ?? false)) {
@@ -3439,12 +3440,14 @@ class _FacilitatorClassroomScreenState
   }
 
   Widget _submitButton({
+    Key? key,
     required String label,
     required VoidCallback? onPressed,
   }) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
+        key: key,
         onPressed: classroomController.isSubmitting.value ? null : onPressed,
         icon: classroomController.isSubmitting.value
             ? const SizedBox(

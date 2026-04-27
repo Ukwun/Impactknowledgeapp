@@ -1,8 +1,11 @@
 import 'package:get/get.dart';
+import 'package:logger/logger.dart';
 import '../models/auth/user_model.dart';
 import '../services/auth/auth_service.dart';
 import '../config/service_locator.dart';
 import '../config/app_config.dart';
+
+final Logger _logger = Logger();
 
 class AuthController extends GetxController {
   final authService = getIt<AuthService>();
@@ -175,9 +178,9 @@ class AuthController extends GetxController {
     final text = error.toString().toLowerCase();
 
     // Log the full error for debugging
-    print('🔴 AUTH ERROR DETAILS:');
-    print('Error type: ${error.runtimeType}');
-    print('Error message: $error');
+    _logger.e('AUTH ERROR DETAILS');
+    _logger.e('Error type: ${error.runtimeType}');
+    _logger.e('Error message', error: error);
 
     if (text.contains('connection timeout') ||
         text.contains('connection error') ||

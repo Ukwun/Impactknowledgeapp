@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:logger/logger.dart';
 import '../../config/role_dashboard_resolver.dart';
 import '../../config/app_config.dart';
 import '../../models/auth/user_model.dart';
 import '../api/api_service.dart';
 import 'dashboard_cache_service.dart';
+
+final Logger _logger = Logger();
 
 class DashboardService {
   final ApiService apiService;
@@ -107,7 +110,7 @@ class DashboardService {
             : '${AppConfig.apiBaseUrl}/';
         final url = Uri.parse('$baseUrl$endpoint');
 
-        print('→ DASHBOARD REQUEST: GET $url');
+        _logger.i('DASHBOARD REQUEST: GET $url');
 
         final response = await http
             .get(
@@ -122,7 +125,7 @@ class DashboardService {
               onTimeout: () => throw Exception('Dashboard request timeout'),
             );
 
-        print('← DASHBOARD RESPONSE: ${response.statusCode} $url');
+        _logger.i('DASHBOARD RESPONSE: ${response.statusCode} $url');
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -131,7 +134,7 @@ class DashboardService {
           throw Exception('HTTP ${response.statusCode}: ${response.body}');
         }
       } catch (e) {
-        print('✗ DASHBOARD ERROR: $e');
+        _logger.e('DASHBOARD ERROR', error: e);
         lastError = e;
       }
     }

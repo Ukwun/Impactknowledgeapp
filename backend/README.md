@@ -31,8 +31,9 @@ Node.js + Express backend API for the ImpactKnowledge Flutter mobile app.
 3. **Configure environment**
    - Copy `.env.example` to `.env`
    - Update database credentials with your Render PostgreSQL details
-   - Set JWT_SECRET to a long random string
-   - Add Stripe credentials and webhook secret
+  - Set `JWT_SECRET` and `JWT_REFRESH_SECRET` to long random strings
+  - Add Stripe credentials and webhook secret
+  - Add Cloudinary credentials for signed media uploads
 
 4. **Run locally**
    ```bash
@@ -106,6 +107,11 @@ The backend automatically creates all required tables on startup via the `initia
 ### 2. Deploy steps
 - Push code to GitHub (recommended)
 - On Render dashboard, click "Deploy"
+- Set signed upload secrets in Render environment variables:
+  - `CLOUDINARY_CLOUD_NAME`
+  - `CLOUDINARY_API_KEY`
+  - `CLOUDINARY_API_SECRET`
+  - `JWT_REFRESH_SECRET`
 - Monitor deployment logs
 
 ### 3. Get your API URL
@@ -126,6 +132,12 @@ class AppConfig {
 ### Health Check
 ```bash
 curl https://impactapp-backend.onrender.com/health
+```
+
+### Upload Readiness Check
+```bash
+curl -H "Authorization: Bearer <admin-token>" \
+  https://impactapp-backend.onrender.com/api/system/upload-readiness
 ```
 
 ### Register User
@@ -177,7 +189,27 @@ See `.env.example` for all configuration options.
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`: PostgreSQL connection
 - `PORT`: Server port (default 3000)
 - `JWT_SECRET`: Secret key for JWT signing
+- `JWT_REFRESH_SECRET`: Secret key for refresh token rotation
+- `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`: Signed upload configuration
 - `NODE_ENV`: `development` or `production`
+
+## Load Testing
+
+Run the focused critical-flow harness against staging or a disposable environment:
+
+```bash
+npm run load:test:critical
+```
+
+Provide the required tokens and resource ids through environment variables in `.env` or your shell before running it.
+
+The harness covers:
+- auth refresh
+- classroom activity creation
+- classroom live session creation
+- upload sign and upload complete
+- enrollments listing
+- payments lookup
 
 ## Error Handling
 

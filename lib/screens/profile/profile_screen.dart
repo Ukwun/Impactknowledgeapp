@@ -82,7 +82,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             bio: bioController.text.trim(),
                             avatarUrl: avatarController.text.trim(),
                           );
-                          if (mounted) Navigator.of(context).pop();
+                          if (!context.mounted) return;
+                          Navigator.of(context).pop();
                         },
                   icon: _saving
                       ? const SizedBox(

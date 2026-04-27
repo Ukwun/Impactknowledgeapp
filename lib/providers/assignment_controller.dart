@@ -1,6 +1,9 @@
 import 'package:get/get.dart';
+import 'package:logger/logger.dart';
 import '../services/api/api_service.dart';
 import '../config/service_locator.dart';
+
+final Logger _logger = Logger();
 
 class AssignmentController extends GetxController {
   final apiService = getIt<ApiService>();
@@ -32,7 +35,7 @@ class AssignmentController extends GetxController {
       }
     } catch (e) {
       error.value = 'Failed to load assignments: ${e.toString()}';
-      print('Error loading assignments: $e');
+      _logger.e('Error loading assignments', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -43,7 +46,7 @@ class AssignmentController extends GetxController {
     try {
       return assignments.firstWhereOrNull((a) => a['id'] == assignmentId);
     } catch (e) {
-      print('Error getting assignment: $e');
+      _logger.e('Error getting assignment', error: e);
       return null;
     }
   }
@@ -60,7 +63,7 @@ class AssignmentController extends GetxController {
           : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load assignment: ${e.toString()}';
-      print('Error loading assignment: $e');
+      _logger.e('Error loading assignment', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -96,7 +99,7 @@ class AssignmentController extends GetxController {
       return false;
     } catch (e) {
       error.value = 'Failed to submit assignment: ${e.toString()}';
-      print('Error submitting assignment: $e');
+      _logger.e('Error submitting assignment', error: e);
       return false;
     } finally {
       isLoading.value = false;
@@ -115,7 +118,7 @@ class AssignmentController extends GetxController {
           : <String, dynamic>{};
     } catch (e) {
       error.value = 'Failed to load submission: ${e.toString()}';
-      print('Error loading submission: $e');
+      _logger.e('Error loading submission', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -139,7 +142,7 @@ class AssignmentController extends GetxController {
       }
     } catch (e) {
       error.value = 'Failed to load submissions: ${e.toString()}';
-      print('Error loading submissions: $e');
+      _logger.e('Error loading submissions', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -157,7 +160,7 @@ class AssignmentController extends GetxController {
           .toList();
     } catch (e) {
       error.value = 'Failed to load grades: ${e.toString()}';
-      print('Error loading grades: $e');
+      _logger.e('Error loading grades', error: e);
     } finally {
       isLoading.value = false;
     }
@@ -181,7 +184,7 @@ class AssignmentController extends GetxController {
       return false;
     } catch (e) {
       error.value = 'Failed to download submission: ${e.toString()}';
-      print('Error downloading: $e');
+      _logger.e('Error downloading submission file', error: e);
       return false;
     } finally {
       isLoading.value = false;
@@ -208,7 +211,7 @@ class AssignmentController extends GetxController {
       return null;
     } catch (e) {
       error.value = 'Failed to resolve submission file: ${e.toString()}';
-      print('Error resolving file URL: $e');
+      _logger.e('Error resolving submission file URL', error: e);
       return null;
     } finally {
       isLoading.value = false;
@@ -232,7 +235,7 @@ class AssignmentController extends GetxController {
       return false;
     } catch (e) {
       error.value = 'Failed to delete submission file: ${e.toString()}';
-      print('Error deleting file: $e');
+      _logger.e('Error deleting submission file', error: e);
       return false;
     } finally {
       isLoading.value = false;

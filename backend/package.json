@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "test": "jest --detectOpenHandles",
     "verify:dashboards": "node scripts/verify-nonlearner-dashboards.js",
-    "seed:production": "node scripts/seed-production-data.js"
+    "seed:production": "node scripts/seed-production-data.js",
+    "load:test:critical": "node scripts/load-test-critical-flows.js"
   },
   "keywords": ["education", "api", "express"],
   "author": "",

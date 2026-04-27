@@ -457,6 +457,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen>
     _loading.value = true;
     try {
       final savedPath = await _apiService.saveAdminReportToFile(type);
+      if (!mounted) return;
       if (savedPath == null || savedPath.isEmpty) {
         Get.snackbar('Export failed', 'No data returned');
         return;
@@ -561,7 +562,7 @@ class _AdminManagementScreenState extends State<AdminManagementScreen>
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: status,
+                initialValue: status,
                 items: const [
                   DropdownMenuItem(value: 'active', child: Text('active')),
                   DropdownMenuItem(value: 'paused', child: Text('paused')),

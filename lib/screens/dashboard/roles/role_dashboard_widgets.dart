@@ -169,6 +169,60 @@ class RoleActionTile extends StatelessWidget {
   }
 }
 
+class RoleDashboardInsightPanel extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final List<String> items;
+
+  const RoleDashboardInsightPanel({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: Colors.blue[700]),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            ...items
+                .take(3)
+                .map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(item, style: const TextStyle(fontSize: 13)),
+                  ),
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class LiveRoleDashboardData extends StatefulWidget {
   final Future<Map<String, dynamic>> Function() loader;
 

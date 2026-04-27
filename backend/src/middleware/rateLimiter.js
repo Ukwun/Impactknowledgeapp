@@ -66,10 +66,37 @@ const uploadLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Too many token refresh attempts, please try again later.',
+  standardHeaders: false,
+  legacyHeaders: false,
+});
+
+const analyticsLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: 'Too many analytics requests, please try again later.',
+  standardHeaders: false,
+  legacyHeaders: false,
+});
+
+const systemLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: 'Too many system requests, please try again later.',
+  standardHeaders: false,
+  legacyHeaders: false,
+});
+
 module.exports = {
   globalLimiter,
   authLimiter,
   apiLimiter,
   paymentLimiter,
   uploadLimiter,
+  refreshLimiter,
+  analyticsLimiter,
+  systemLimiter,
 };

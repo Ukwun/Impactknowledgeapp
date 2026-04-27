@@ -28,6 +28,16 @@ class FacilitatorDashboardScreen extends StatelessWidget {
           : const Duration(seconds: 30),
       builder: (context, data, isRefreshing, lastUpdated, reload) {
         final d = FacilitatorDashboardData.fromJson(data);
+        final recommendations = (data['recommendations'] is List)
+            ? (data['recommendations'] as List)
+                  .map((item) => item.toString())
+                  .toList()
+            : const <String>[];
+        final interventions = (data['interventions'] is List)
+            ? (data['interventions'] as List)
+                  .map((item) => item.toString())
+                  .toList()
+            : const <String>[];
 
         return RoleDashboardScaffold(
           title: 'Facilitator Dashboard',
@@ -73,6 +83,37 @@ class FacilitatorDashboardScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
+            RoleDashboardStats(
+              stats: [
+                (
+                  'Retention',
+                  '${d.cohortRetentionRate}%',
+                  Icons.favorite_border,
+                ),
+                ('Engagement', '${d.engagementRate}%', Icons.insights_outlined),
+                (
+                  'Intervention Queue',
+                  d.interventionQueue.toString(),
+                  Icons.notifications_active_outlined,
+                ),
+                (
+                  'At-Risk Learners',
+                  d.atRiskLearners.toString(),
+                  Icons.person_search_outlined,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            RoleDashboardInsightPanel(
+              title: 'Recommended Actions',
+              icon: Icons.lightbulb_outline,
+              items: recommendations,
+            ),
+            RoleDashboardInsightPanel(
+              title: 'Intervention Queue',
+              icon: Icons.notification_important_outlined,
+              items: interventions,
+            ),
             RoleActionTile(
               title: 'Open Facilitator Classroom',
               subtitle:
